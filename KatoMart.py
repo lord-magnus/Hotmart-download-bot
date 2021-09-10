@@ -60,15 +60,6 @@ userPass = input("Qual a sua senha da Hotmart?\n")
 maxCursos = 0
 cursoAtual = 1
 
-def clearScreen():
-    if sys.platform.startswith('darwin'):
-        # MacOs specific procedures
-        os.system("clear")
-    elif sys.platform.startswith('win32'):
-        # Windows specific procedures
-        os.system("cls")
-
-
 class Hotmart:
     _userAgent = (
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
@@ -133,6 +124,14 @@ class Hotmart:
                 continue
 
         return cursosValidos
+
+def clearScreen():
+    if sys.platform.startswith('darwin'):
+        # MacOs specific procedures
+        os.system("clear")
+    elif sys.platform.startswith('win32'):
+        # Windows specific procedures
+        os.system("cls")
 
 def verCursos():
     authMart = Hotmart.auth(userEmail, userPass)
