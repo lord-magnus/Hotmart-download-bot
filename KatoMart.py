@@ -155,15 +155,20 @@ def verCursos():
     else:
         baixarCurso(authMart, cursosValidos[opcao], False)
 
-def baixarCurso(authMart, infoCurso, dAll):
-    while True:
-        tempFolder = ''.join(random.choices(
-            string.ascii_uppercase + string.digits, k=7))
+def criaTempFolder():
+    currFolder = os.path.abspath(os.getcwd())
+    tempFolder = currFolder
+
+    while os.path.isdir(tempFolder):
+        folderName = ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
+        tempFolder = os.path.join(currFolder, 'temp', folderName)
+
         if not os.path.isdir(tempFolder):
             os.makedirs(tempFolder)
-            break
-        else:
-            continue
+            return tempFolder
+
+def baixarCurso(authMart, infoCurso, dAll):
+    tempFolder = criaTempFolder()
 
     nmcurso = re.sub(r'[<>:!"/\\|?*]', '', infoCurso['nome']
                      ).strip().replace('.', '').replace("\t", "")
