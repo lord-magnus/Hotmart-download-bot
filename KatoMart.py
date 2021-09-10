@@ -125,6 +125,8 @@ class Hotmart:
 
         return cursosValidos
 
+hotmart = Hotmart()
+
 def clearScreen():
     if sys.platform.startswith('darwin'):
         # MacOs specific procedures
@@ -134,8 +136,8 @@ def clearScreen():
         os.system("cls")
 
 def verCursos():
-    authMart = Hotmart.auth(userEmail, userPass)
-    cursosValidos = Hotmart.getCursos(authMart)
+    authMart = hotmart.auth(userEmail, userPass)
+    cursosValidos = hotmart.getCursos(authMart)
 
     print("Cursos disponíveis para download:")
 
