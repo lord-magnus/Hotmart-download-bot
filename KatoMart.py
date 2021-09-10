@@ -351,9 +351,9 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                     # TODO Melhorar esse workaround para nome longo
                                     if len(videoPath) > 254:
-                                            videosLongos += 1
+                                        videosLongos += 1
 
-                                    if not os.path.isfile(aulaPath):
+                                    if not os.path.isfile(videoPath):
                                         downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
                                     else:
                                         print("VIDEO JA EXISTE")
@@ -366,52 +366,43 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                             try:
                                 fonteExterna = None
                                 pjson = BeautifulSoup(infoAula['content'], features="html.parser")
-                                viframe = pjson.findAll("iframe")
+                                iFrames = pjson.findAll("iframe")
 
-                                for index, i in enumerate(viframe, start=1):
-                                    # TODO Mesmo trecho de aula longa zzz
+                                for index, iFrame in enumerate(iFrames, start=1):
+                                    # TODO Mesmo trecho de aula longa
 
-                                    filePath = os.path.dirname(s.path.abspath(__file__))
-                                    aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{index}.mp4"
+                                    videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
 
-                                    if len(aulaPath) > 254:
-                                        if not os.path.exists(f"Cursos/{NOME_CURSO}/ev"):
-                                            os.makedirs(f"Cursos/{NOME_CURSO}/ev")
-
-                                        tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-
-                                        with open(f"Cursos/{NOME_CURSO}/ev/list.txt", "a", encoding=ENCODING) as safelist:
-                                            safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{index}.mp4\n")
-
-                                        aulaPath = f"Cursos/{NOME_CURSO}/ev/{tempNM}.mp4"
+                                    # TODO Melhorar esse workaround para nome longo
+                                    if len(videoPath) > 254:
                                         videosLongos += 1
 
-                                    if not os.path.isfile(aulaPath):
+                                    if not os.path.isfile(videoPath):
                                         ydl_opts = {"format": "best",
                                                     'retries': 3,
                                                     'fragment_retries': 5,
                                                     'quiet': True,
-                                                    "outtmpl": f"{aulaPath}"}
+                                                    "outtmpl": f"{videoPath}"}
 
-                                        if 'player.vimeo' in i.get("src"):
+                                        if 'player.vimeo' in iFrame.get("src"):
                                             fonteExterna = f"{Colors.Cyan}Vimeo{Colors.Reset}"
-                                            if "?" in i.get("src"):
-                                                linkV = i.get(
+                                            if "?" in iFrame.get("src"):
+                                                linkV = iFrame.get(
                                                     "src").split("?")[0]
                                             else:
-                                                linkV = i.get("src")
+                                                linkV = iFrame.get("src")
                                             if linkV[-1] == "/":
                                                 linkV = linkV.split("/")[-1]
 
-                                        elif 'vimeo.com' in i.get("src"):
+                                        elif 'vimeo.com' in iFrame.get("src"):
                                             fonteExterna = f"{Colors.Cyan}Vimeo{Colors.Reset}"
-                                            vimeoID = i.get("src").split(
+                                            vimeoID = iFrame.get("src").split(
                                                 'vimeo.com/')[1]
                                             if "?" in vimeoID:
                                                 vimeoID = vimeoID.split("?")[0]
                                             linkV = "https://player.vimeo.com/video/" + vimeoID
 
-                                        elif "wistia.com" in i.get("src"):
+                                        elif "wistia.com" in iFrame.get("src"):
                                             # TODO Implementar Wistia
                                             fonteExterna = None
                                             # fonteExterna = f"{C.Yellow}Wistia{C.Reset}"
@@ -419,9 +410,9 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                             # :( Ajuda noix Telegram: @katomaro
                                             raise KeyError
 
-                                        elif "youtube.com" in i.get("src") or "youtu.be" in i.get("src"):
+                                        elif "youtube.com" in iFrame.get("src") or "youtu.be" in iFrame.get("src"):
                                             fonteExterna = f"{Colors.Red}YouTube{Colors.Reset}"
-                                            linkV = i.get("src")
+                                            linkV = iFrame.get("src")
 
                                         if fonteExterna is not None:
                                             print(
@@ -455,8 +446,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html"
-                                if len(aulaPath) > 254:
+                                videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html"
+                                if len(videoPath) > 254:
                                     if not os.path.exists(f"Cursos/{NOME_CURSO}/ed"):
                                         os.makedirs(f"Cursos/{NOME_CURSO}/ed")
                                     tempNM = ''.join(random.choices(
@@ -464,11 +455,11 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                     with open(f"Cursos/{NOME_CURSO}/ed/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
                                             f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
-                                    aulaPath = f"Cursos/{NOME_CURSO}/ed/{tempNM}.html"
+                                    videoPath = f"Cursos/{NOME_CURSO}/ed/{tempNM}.html"
                                     descLongas += 1
 
-                                if not os.path.isfile(f"{aulaPath}"):
-                                    with open(f"{aulaPath}", "w", encoding=ENCODING) as desct:
+                                if not os.path.isfile(f"{videoPath}"):
+                                    with open(f"{videoPath}", "w", encoding=ENCODING) as desct:
                                         desct.write(infoAula['content'])
                                         print(
                                             f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
@@ -486,8 +477,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}"
-                                if len(aulaPath) > 254:
+                                videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}"
+                                if len(videoPath) > 254:
                                     if not os.path.exists(f"Cursos/{NOME_CURSO}/et"):
                                         os.makedirs(f"Cursos/{NOME_CURSO}/et")
                                     tempNM = ''.join(random.choices(
@@ -495,7 +486,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                     with open(f"Cursos/{NOME_CURSO}/et/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
                                             f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}\n")
-                                    aulaPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
+                                    videoPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
                                     anexosLongos += 1
 
                                 try:
@@ -505,7 +496,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                 except:
                                     pass
 
-                                if not os.path.isfile(f"{aulaPath}"):
+                                if not os.path.isfile(f"{videoPath}"):
                                     while True:
                                         try:
                                             try:
@@ -523,7 +514,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                                 anexo = requests.get(
                                                     vrum.get(lambdaUrl).text)
                                                 del vrum
-                                            with open(f"{aulaPath}", 'wb') as ann:
+                                            with open(f"{videoPath}", 'wb') as ann:
                                                 ann.write(anexo.content)
                                                 print(
                                                     f"{Colors.Magenta}Anexo baixado com sucesso!{Colors.Reset}")
@@ -541,8 +532,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt"
-                                if len(aulaPath) > 254:
+                                videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt"
+                                if len(videoPath) > 254:
                                     if not os.path.exists(f"Cursos/{NOME_CURSO}/el"):
                                         os.makedirs(f"Cursos/{NOME_CURSO}/el")
                                     tempNM = ''.join(random.choices(
@@ -550,14 +541,14 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                     with open(f"Cursos/{NOME_CURSO}/el/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
                                             f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt\n")
-                                    aulaPath = f"Cursos/{NOME_CURSO}/el/links.txt"
+                                    videoPath = f"Cursos/{NOME_CURSO}/el/links.txt"
                                     linksLongos += 1
 
-                                if not os.path.isfile(f"{aulaPath}"):
+                                if not os.path.isfile(f"{videoPath}"):
                                     print(
                                         f"{Colors.Magenta}Link Complementar encontrado!{Colors.Reset}")
                                     for link in infoAula['complementaryReadings']:
-                                        with open(f"{aulaPath}", "a", encoding=ENCODING) as linkz:
+                                        with open(f"{videoPath}", "a", encoding=ENCODING) as linkz:
                                             linkz.write(f"{link}\n")
 
                                 else:
