@@ -309,11 +309,9 @@ def baixarCurso(authMart, infoCurso, downloadAll):
     descCount = 0
     attCount = 0
     linkCount = 0
-    videosLongos = 0
     descLongas = 0
     linksLongos = 0
     anexosLongos = 0
-    videosInexistentes = 0
 
     try:
         for modulo in curso['modules']:
@@ -353,91 +351,24 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                     if len(videoPath) > 254:
                                         videosLongos += 1
 
+                                    success = None
+
                                     if not os.path.isfile(videoPath):
-                                        downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
+                                        sucess = downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
                                     else:
                                         print("VIDEO JA EXISTE")
+                                        success = True
+
+                                    if sucess:
                                         vidCount += 1
 
                                 # tryDL = 0
 
                         # Download de aula Externa
                         except KeyError:
-                            try:
-                                fonteExterna = None
-                                pjson = BeautifulSoup(infoAula['content'], features="html.parser")
-                                iFrames = pjson.findAll("iframe")
+                            videos, videosLongos, videosInexistentes = downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
+                            vidCount += videos
 
-                                for index, iFrame in enumerate(iFrames, start=1):
-                                    # TODO Mesmo trecho de aula longa
-
-                                    videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
-
-                                    # TODO Melhorar esse workaround para nome longo
-                                    if len(videoPath) > 254:
-                                        videosLongos += 1
-
-                                    if not os.path.isfile(videoPath):
-                                        ydl_opts = {"format": "best",
-                                                    'retries': 3,
-                                                    'fragment_retries': 5,
-                                                    'quiet': True,
-                                                    "outtmpl": f"{videoPath}"}
-
-                                        if 'player.vimeo' in iFrame.get("src"):
-                                            fonteExterna = f"{Colors.Cyan}Vimeo{Colors.Reset}"
-                                            if "?" in iFrame.get("src"):
-                                                linkV = iFrame.get(
-                                                    "src").split("?")[0]
-                                            else:
-                                                linkV = iFrame.get("src")
-                                            if linkV[-1] == "/":
-                                                linkV = linkV.split("/")[-1]
-
-                                        elif 'vimeo.com' in iFrame.get("src"):
-                                            fonteExterna = f"{Colors.Cyan}Vimeo{Colors.Reset}"
-                                            vimeoID = iFrame.get("src").split(
-                                                'vimeo.com/')[1]
-                                            if "?" in vimeoID:
-                                                vimeoID = vimeoID.split("?")[0]
-                                            linkV = "https://player.vimeo.com/video/" + vimeoID
-
-                                        elif "wistia.com" in iFrame.get("src"):
-                                            # TODO Implementar Wistia
-                                            fonteExterna = None
-                                            # fonteExterna = f"{C.Yellow}Wistia{C.Reset}"
-                                            # Preciso de um curso que tenha aula do Wistia para ver como tá sendo dado
-                                            # :( Ajuda noix Telegram: @katomaro
-                                            raise KeyError
-
-                                        elif "youtube.com" in iFrame.get("src") or "youtu.be" in iFrame.get("src"):
-                                            fonteExterna = f"{Colors.Red}YouTube{Colors.Reset}"
-                                            linkV = iFrame.get("src")
-
-                                        if fonteExterna is not None:
-                                            print(
-                                                f"{Colors.Magenta}Baixando aula externa de fonte: {fonteExterna}!")
-                                            try:
-                                                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                                                    ydl.download([linkV])
-                                                vidCount += 1
-                                            # TODO especificar os erros de Live Agendada(YouTube) e Video Inexistente
-                                            except:
-                                                print(
-                                                    f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
-                                                with open(f"Cursos/{NOME_CURSO}/erros.txt", "a", encoding=ENCODING) as elog:
-                                                    elog.write(
-                                                        f"{linkV} - {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}")
-                                                videosInexistentes += 1
-                                    else:
-                                        vidCount += 1
-
-                                # tryDL = 0
-
-                            except KeyError:
-                                print(
-                                    f"{Colors.Bold}{Colors.Red}Ué, erro ao salvar essa aula, pulada!{Colors.Reset} (verifique se ela tem vídeo desbloqueado na plataforma)")
-                                tryDL = 0
 
                         # Count Descrições
                         try:
@@ -614,74 +545,163 @@ def baixarCurso(authMart, infoCurso, downloadAll):
         verCursos()
 
 
+def downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
+    try:
+        fonteExterna = None
+        videosLongos = 0
+        videosInexistentes = 0
+        vidCount = 0
+
+        content = BeautifulSoup(infoAula['content'], features="html.parser")
+        iFrames = content.findAll("iframe")
+
+        for index, iFrame in enumerate(iFrames, start=1):
+            # TODO Mesmo trecho de aula longa
+            videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
+
+            # TODO Melhorar esse workaround para nome longo
+            if len(videoPath) > 254:
+                videosLongos += 1
+
+            if not os.path.isfile(videoPath):
+                ydl_opts = {"format": "best",
+                            'retries': 3,
+                            'fragment_retries': 5,
+                            'quiet': True,
+                            "outtmpl": f"{videoPath}"}
+
+                if 'player.vimeo' in iFrame.get("src"):
+                    fonteExterna = f"{Colors.Cyan}Vimeo{Colors.Reset}"
+
+                    if "?" in iFrame.get("src"):
+                        videoLink = iFrame.get("src").split("?")[0]
+                    else:
+                        videoLink = iFrame.get("src")
+
+                    if videoLink[-1] == "/":
+                        videoLink = videoLink.split("/")[-1]
+
+                elif 'vimeo.com' in iFrame.get("src"):
+                    fonteExterna = f"{Colors.Cyan}Vimeo{Colors.Reset}"
+                    vimeoID = iFrame.get("src").split('vimeo.com/')[1]
+
+                    if "?" in vimeoID:
+                        vimeoID = vimeoID.split("?")[0]
+
+                    videoLink = "https://player.vimeo.com/video/" + vimeoID
+
+                elif "wistia.com" in iFrame.get("src"):
+                    # TODO Implementar Wistia
+                    fonteExterna = None
+                    # fonteExterna = f"{C.Yellow}Wistia{C.Reset}"
+                    # Preciso de um curso que tenha aula do Wistia para ver como tá sendo dado
+                    # :( Ajuda noix Telegram: @katomaro
+                    raise KeyError
+
+                elif "youtube.com" in iFrame.get("src") or "youtu.be" in iFrame.get("src"):
+                    fonteExterna = f"{Colors.Red}YouTube{Colors.Reset}"
+                    videoLink = iFrame.get("src")
+
+                if fonteExterna is not None:
+                    print(f"{Colors.Magenta}Baixando aula externa de fonte: {fonteExterna}!")
+
+                    try:
+                        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([videoLink])
+                        vidCount += 1
+
+                        # TODO especificar os erros de Live Agendada(YouTube) e Video Inexistente
+                    except:
+                        print(f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
+
+                        with open(f"Cursos/{NOME_CURSO}/erros.txt", "a", encoding=ENCODING) as elog:
+                            elog.write( f"{videoLink} - {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}")
+
+                        videosInexistentes += 1
+            else:
+                vidCount += 1
+
+                # tryDL = 0
+
+    except KeyError:
+        print(f"{Colors.Bold}{Colors.Red}Ué, erro ao salvar essa aula, pulada!{Colors.Reset} (verifique se ela tem vídeo desbloqueado na plataforma)")
+        tryDL = 0
+
+    return vidCount, videosLongos, videosInexistentes
+
+
 def downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset):
-    videoData = authMart.get(
-        f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
-    masterPlaylist = m3u8.loads(videoData.text)
-    res = []
-    highestQual = None
-    for playlist in masterPlaylist.playlists:
-        res.append(
-            playlist.stream_info.resolution)
-    res.sort(reverse=True)
-    for playlist in masterPlaylist.playlists:
-        if playlist.stream_info.resolution == res[0]:
-            highestQual = playlist.uri
-    if highestQual is not None:
+    try:
         videoData = authMart.get(
-            f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
-        with open(f'{TEMP_FOLDER}/dump.m3u8', 'w') as dump:
-            dump.write(videoData.text)
-        videoPlaylist = m3u8.loads(
-            videoData.text)
-        key = videoPlaylist.segments[0].key.uri
-        totalSegmentos = videoPlaylist.segments[-1].uri.split(".")[
-            0].split("-")[1]
-        for segment in videoPlaylist.segments:
-            print(f"\r\tBaixando o segmento {Colors.Blue}{segment.uri.split('.')[0].split('-')[1]}{Colors.Reset}/{Colors.Magenta}{totalSegmentos}{Colors.Reset}!",
-                  end="", flush=True)
-            uri = segment.uri
-            frag = authMart.get(
-                f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
-            with open(f"{TEMP_FOLDER}/" + uri, 'wb') as sfrag:
-                sfrag.write(
-                    frag.content)
-        fragkey = authMart.get(
-            f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
-        with open(f"{TEMP_FOLDER}/{key}", 'wb') as skey:
-            skey.write(fragkey.content)
-        print(
-            f"\r\tSegmentos baixados, gerando video final! {Colors.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Colors.Reset}", end="\n", flush=True)
+            f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
+        masterPlaylist = m3u8.loads(videoData.text)
+        res = []
+        highestQual = None
+        for playlist in masterPlaylist.playlists:
+            res.append(
+                playlist.stream_info.resolution)
+        res.sort(reverse=True)
+        for playlist in masterPlaylist.playlists:
+            if playlist.stream_info.resolution == res[0]:
+                highestQual = playlist.uri
+        if highestQual is not None:
+            videoData = authMart.get(
+                f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
+            with open(f'{TEMP_FOLDER}/dump.m3u8', 'w') as dump:
+                dump.write(videoData.text)
+            videoPlaylist = m3u8.loads(
+                videoData.text)
+            key = videoPlaylist.segments[0].key.uri
+            totalSegmentos = videoPlaylist.segments[-1].uri.split(".")[
+                0].split("-")[1]
+            for segment in videoPlaylist.segments:
+                print(f"\r\tBaixando o segmento {Colors.Blue}{segment.uri.split('.')[0].split('-')[1]}{Colors.Reset}/{Colors.Magenta}{totalSegmentos}{Colors.Reset}!",
+                    end="", flush=True)
+                uri = segment.uri
+                frag = authMart.get(
+                    f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
+                with open(f"{TEMP_FOLDER}/" + uri, 'wb') as sfrag:
+                    sfrag.write(
+                        frag.content)
+            fragkey = authMart.get(
+                f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
+            with open(f"{TEMP_FOLDER}/{key}", 'wb') as skey:
+                skey.write(fragkey.content)
+            print(
+                f"\r\tSegmentos baixados, gerando video final! {Colors.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Colors.Reset}", end="\n", flush=True)
 
-        # TODO Implementar verificação de hardware acceleration
-        # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
+            # TODO Implementar verificação de hardware acceleration
+            # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
-        ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {TEMP_FOLDER}/dump.m3u8 -n "{aulaPath}"'
+            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {TEMP_FOLDER}/dump.m3u8 -n "{aulaPath}"'
 
-        if sys.platform.startswith('darwin'):
-            # MacOs specific procedures
-            subprocess.run(
-                ffmpegcmd, shell=True)
-        elif sys.platform.startswith('win32'):
-            # Windows specific procedures
-            subprocess.run(ffmpegcmd)
+            if sys.platform.startswith('darwin'):
+                # MacOs specific procedures
+                subprocess.run(
+                    ffmpegcmd, shell=True)
+            elif sys.platform.startswith('win32'):
+                # Windows specific procedures
+                subprocess.run(ffmpegcmd)
 
-            # TODO Implementar verificação de falha pelo FFMPEG
-            # p = subprocess.run(ffmpegcmd)
-            # if p.returncode != 0:
-            #     pass
+                # TODO Implementar verificação de falha pelo FFMPEG
+                # p = subprocess.run(ffmpegcmd)
+                # if p.returncode != 0:
+                #     pass
 
-        vidCount += 1
-        print(
-            f"Download da aula {Colors.Bold}{Colors.Magenta}{NOME_MODULO}/{NOME_AULA}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
-        time.sleep(3)
-        for ff in glob.glob(f"{TEMP_FOLDER}/*"):
-            os.remove(ff)
+            print(
+                f"Download da aula {Colors.Bold}{Colors.Magenta}{NOME_MODULO}/{NOME_AULA}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
+            time.sleep(3)
+            for ff in glob.glob(f"{TEMP_FOLDER}/*"):
+                os.remove(ff)
 
-    else:
-        print(
-            f"{Colors.Red}{Colors.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{Colors.Reset}")
-        raise HTTPError
+        else:
+            print(
+                f"{Colors.Red}{Colors.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{Colors.Reset}")
+            raise HTTPError
+    except:
+        return False
+
+    return True
 
 clearScreen()
 verCursos()
