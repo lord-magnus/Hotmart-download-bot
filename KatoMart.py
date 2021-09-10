@@ -36,6 +36,7 @@ import time
 import m3u8
 import json
 import subprocess
+import sys
 
 from requests import HTTPError, Timeout
 from requests.exceptions import ChunkedEncodingError, ContentDecodingError
@@ -45,8 +46,13 @@ userEmail = input("Qual o seu Email da Hotmart?\n")
 userPass = input("Qual a sua senha da Hotmart?\n")
 maxCursos = 0
 cursoAtual = 1
-os.system("cls")
 
+if sys.platform.startswith('darwin'):
+    # MacOs specific procedures
+    os.system("clear")
+elif sys.platform.startswith('win32'):
+    # Windows specific procedures
+    os.system("cls")
 
 class C:
     # Essa classe é puramente estética servindo para colorir as informações exibidas pelo programa
@@ -131,7 +137,14 @@ def baixarCurso(authMart, infoCurso, dAll):
     nmcurso = re.sub(r'[<>:!"/\\|?*]', '', infoCurso['nome']).strip().replace('.', '').replace("\t", "")
     if not os.path.exists('Cursos/' + nmcurso):
         os.makedirs('Cursos/' + nmcurso)
-    os.system('cls')
+
+    if sys.platform.startswith('darwin'):
+        # MacOs specific procedures
+        os.system("clear")
+    elif sys.platform.startswith('win32'):
+        # Windows specific procedures
+        os.system("cls")
+
     if dAll:
         global maxCursos
         global cursoAtual
@@ -262,7 +275,14 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
                                                 ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{aulaPath}"'
-                                                subprocess.run(ffmpegcmd)
+
+                                                if sys.platform.startswith('darwin'):
+                                                    # MacOs specific procedures
+                                                    subprocess.run(ffmpegcmd, shell=True)
+                                                elif sys.platform.startswith('win32'):
+                                                    # Windows specific procedures
+                                                    subprocess.run(ffmpegcmd)
+
                                                 # TODO Implementar verificação de falha pelo FFMPEG
                                                 # p = subprocess.run(ffmpegcmd)
                                                 # if p.returncode != 0:
