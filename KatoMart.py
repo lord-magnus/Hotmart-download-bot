@@ -141,8 +141,8 @@ def verCursos():
 
     print("Cursos disponíveis para download:")
 
-    for i, curso in enumerate(cursosValidos, start=1):
-        print("\t", i, curso['nome'])
+    for index, curso in enumerate(cursosValidos, start=1):
+        print("\t", index, curso['nome'])
 
     opcao = int(input( f"Qual curso deseja baixar? {Colors.Magenta}(0 para todos!){Colors.Reset}\n")) - 1
 
