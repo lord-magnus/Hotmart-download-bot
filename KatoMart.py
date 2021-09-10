@@ -33,22 +33,22 @@
 # Já o "log.txt" dentro da pasta do curso apenas indica as ações do bot,
 # fácil para acompanhar junto com o "debug.txt".
 
-import random
-import string
 import datetime
-import requests
-import re
 import glob
-import youtube_dl
-import os
-import time
-import m3u8
 import json
+import os
+import random
+import re
+import string
 import subprocess
 import sys
+import time
+
+import m3u8
+import requests
+import youtube_dl
 
 from bs4 import BeautifulSoup
-
 from requests import HTTPError, Timeout
 from requests.exceptions import ChunkedEncodingError, ContentDecodingError
 
