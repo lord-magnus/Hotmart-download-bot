@@ -1,0 +1,4 @@
+beautifulsoup4==4.10.0
+m3u8==0.9.0
+requests==2.26.0
+youtube-dl==2021.6.6
