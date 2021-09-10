@@ -213,6 +213,25 @@ def criaSubDir(parentDir, order, nome):
 
     return (cleanName, dirPath)
 
+# TODO Melhorar esse workaround para nome longo
+def criaVideo(PATH_CURSO, PATH_AULA, index):
+    videoPath = os.path.join(PATH_AULA , f"aula-{index}.mp4")
+    evPath = os.path.join(PATH_CURSO , "ev")
+
+    if len(videoPath) > 254:
+        if not os.path.exists(evPath):
+            os.makedirs(evPath)
+
+        tempName = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        listPath = os.path.join(evPath , "list.txt")
+
+        with open(listPath, "a", encoding=ENCODING) as safelist:
+            safelist.write(f"{tempName} = {videoPath}\n")
+
+        videoPath = os.path.join(evPath , f"{tempName}.mp4")
+
+    return videoPath
+
 def getInfoAula(dominio, url, hash):
     #  TODO Melhorar isso lol
     infoAula = None
@@ -328,20 +347,12 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                 segVideos += playerInfo['mediaDuration']
 
                                 for asset in playerInfo['assets']:
+                                    videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
+
                                     # TODO Melhorar esse workaround para nome longo
+                                    if len(videoPath) > 254:
+                                            videosLongos += 1
 
-                                    aulaPath = os.path.join(PATH_AULA , "aula-{index}.mp4")
-                                    if len(aulaPath) > 254:
-                                        if not os.path.exists(f"Cursos/{NOME_CURSO}/ev"):
-                                            os.makedirs(f"Cursos/{NOME_CURSO}/ev")
-
-                                        tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-
-                                        with open(f"Cursos/{NOME_CURSO}/ev/list.txt", "a", encoding=ENCODING) as safelist:
-                                            safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{index}.mp4\n")
-
-                                        aulaPath = f"Cursos/{NOME_CURSO}/ev/{tempNM}.mp4"
-                                        videosLongos += 1
                                     if not os.path.isfile(aulaPath):
                                         videoData = authMart.get(
                                             f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
