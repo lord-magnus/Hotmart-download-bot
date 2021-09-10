@@ -178,15 +178,12 @@ def criaTempFolder():
                 os.makedirs(tempFolder)
             except:
                 pass
-            return tempFolder
+            break
+    
+    return tempFolder
 
-def baixarCurso(authMart, infoCurso, dAll):
-    TEMP_FOLDER = criaTempFolder()
-
-    NOME_CURSO = re.sub(
-        r'[<>:!"/\\|?*]', 
-        '',
-        infoCurso['nome']) \
+def criaCursoFolder(nome):
+    NOME_CURSO = re.sub(r'[<>:!"/\\|?*]', '', nome) \
         .strip() \
         .replace('.', '') \
         .replace("\t", "")
@@ -201,15 +198,20 @@ def baixarCurso(authMart, infoCurso, dAll):
             os.makedirs(pathCurso)
         except:
             pass
+
+    return pathCurso
+
+def baixarCurso(authMart, infoCurso, downloadAll):
+    TEMP_FOLDER = criaTempFolder()
+    PATH_CURSO = criaCursoFolder(infoCurso['nome'])
     
     clearScreen()
 
-    if dAll:
+    if downloadAll:
         global maxCursos
         global cursoAtual
 
-        print(
-            f"{Colors.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
+        print(f"{Colors.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
         cursoAtual += 1
 
     DOMINIO = infoCurso['resource']['subdomain']
@@ -231,6 +233,7 @@ def baixarCurso(authMart, infoCurso, dAll):
     # Descomentar para ver o que caralhos a plataforma dá de json de curso
     # with open('data.json', 'w', encoding=ENCODING) as f:
     #     json.dump(curso, f, ensure_ascii=False, indent=4)
+    
     moduleCount = 0
     lessonCount = 0
     vidCount = 0
@@ -650,7 +653,7 @@ def baixarCurso(authMart, infoCurso, dAll):
 
     os.rmdir(TEMP_FOLDER)
 
-    if not dAll:
+    if not downloadAll:
         verCursos()
 
 clearScreen()
