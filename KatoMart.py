@@ -61,15 +61,15 @@ maxCursos = 0
 cursoAtual = 1
 
 class Hotmart:
-    _userAgent = (
+    _USER_AGENT = (
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
         ' AppleWebKit/537.36 (KHTML, like Gecko)'
         ' Chrome/91.0.4472.106 Safari/537.36'
     )
 
-    def auth(userEmail, userPass):
+    def auth(self, userEmail, userPass):
         authMart = requests.session()
-        authMart.headers['user-agent'] = _userAgent
+        authMart.headers['user-agent'] = self._USER_AGENT
 
         data = {
             'username': userEmail,
@@ -85,41 +85,44 @@ class Hotmart:
 
         try:
             authMart.headers.clear()
-            authMart.headers['user-agent'] = _userAgent
+            authMart.headers['user-agent'] = self._USER_AGENT
             authMart.headers['authorization'] = f"Bearer {authSparkle['access_token']}"
         except KeyError:
             print(f"{Colors.Red}{Colors.Bold}Tentativa de login falhou! Verifique os dados ou contate o @katomaro (Telegram){Colors.Reset}")
             exit(13)
         return authMart
 
-    def getProdutos(authMart):
+    def getProdutos(self, authMart):
         return authMart.get(
             'https://api-sec-vlc.hotmart.com/security/oauth/check_token',
             params={'token': authMart.headers['authorization'].split(" ")[1]}) \
             .json()['resources']
 
-    def getCursos(authMart):
-        produtos = getProdutos(authMart)
+    def getCursos(self, authMart):
+        produtos = self.getProdutos(authMart)
         cursosValidos = []
 
         for produto in produtos:
             try:
-                if produto['resource']['status'] == "ACTIVE" or "STUDENT" in produto['roles']:
-                    dominio = produto['resource']['subdomain']
+                if produto['resource']['status'] != "ACTIVE" and "STUDENT" not in produto['roles']:
+                    continue
 
-                    authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com'
-                    authMart.headers['referer'] = authMart.headers['origin']
-                    authMart.headers['club'] = dominio
+                dominio = produto['resource']['subdomain']
 
-                    membership = authMart.get('https://api-club.hotmart.com/hot-club-api/rest/v3/membership?attach_token=false') \
-                        .json()['name']
+                authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com'
+                authMart.headers['referer'] = authMart.headers['origin']
+                authMart.headers['club'] = dominio
 
-                    produto["nome"] = re.sub(r'[<>:!"/\\|?*]', '', ) \
-                        .strip() \
-                        .replace(".", "") \
-                        .replace("\t", "")
+                membership = authMart \
+                    .get('https://api-club.hotmart.com/hot-club-api/rest/v3/membership?attach_token=false') \
+                    .json()['name']
 
-                    cursosValidos.append(produto)
+                produto["nome"] = re.sub(r'[<>:!"/\\|?*]', '', membership) \
+                    .strip() \
+                    .replace(".", "") \
+                    .replace("\t", "")
+
+                cursosValidos.append(produto)
             except KeyError:
                 continue
 
