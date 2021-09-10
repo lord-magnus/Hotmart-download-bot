@@ -55,8 +55,14 @@ from requests.exceptions import ChunkedEncodingError, ContentDecodingError
 from AnsiEscapeCodes import Colors
 
 # GLOBALS
-userEmail = input("Qual o seu Email da Hotmart?\n")
-userPass = input("Qual a sua senha da Hotmart?\n")
+USER_EMAIL = input("Qual o seu Email da Hotmart?\n")
+USER_PASS = input("Qual a sua senha da Hotmart?\n")
+
+HOTMART_API = 'https://api-club.hotmart.com/hot-club-api/rest/v3'
+CONTENT_TYPE = 'application/json, text/plain, */*'
+NO_CACHE = 'no-cache'
+ENCODING = "utf-8"
+
 maxCursos = 0
 cursoAtual = 1
 
@@ -77,9 +83,8 @@ class Hotmart:
             'grant_type': 'password'
         }
 
-        authSparkle = authMart.post(
-            'https://api.sparkleapp.com.br/oauth/token',
-            data=data)
+        GET_TOKEN_URL = 'https://api.sparkleapp.com.br/oauth/token'
+        authSparkle = authMart.post(GET_TOKEN_URL, data=data)
 
         authSparkle = authSparkle.json()
 
@@ -93,9 +98,10 @@ class Hotmart:
         return authMart
 
     def getProdutos(self, authMart):
-        return authMart.get(
-            'https://api-sec-vlc.hotmart.com/security/oauth/check_token',
-            params={'token': authMart.headers['authorization'].split(" ")[1]}) \
+        CHECK_TOKEN_URL = 'https://api-sec-vlc.hotmart.com/security/oauth/check_token'
+        TOKEN = authMart.headers['authorization'].split(" ")[1]
+
+        return authMart.get(CHECK_TOKEN_URL, params={'token': TOKEN}) \
             .json()['resources']
 
     def getCursos(self, authMart):
@@ -107,14 +113,15 @@ class Hotmart:
                 if produto['resource']['status'] != "ACTIVE" and "STUDENT" not in produto['roles']:
                     continue
 
-                dominio = produto['resource']['subdomain']
+                HOST = produto['resource']['subdomain']
+                URL = f'https://{HOST}.club.hotmart.com'
 
-                authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com'
-                authMart.headers['referer'] = authMart.headers['origin']
-                authMart.headers['club'] = dominio
+                authMart.headers['origin'] = URL
+                authMart.headers['referer'] = URL
+                authMart.headers['club'] = HOST
 
                 membership = authMart \
-                    .get('https://api-club.hotmart.com/hot-club-api/rest/v3/membership?attach_token=false') \
+                    .get(f'{HOTMART_API}/membership?attach_token=false') \
                     .json()['name']
 
                 produto["nome"] = re.sub(r'[<>:!"/\\|?*]', '', membership) \
@@ -139,7 +146,7 @@ def clearScreen():
         os.system("cls")
 
 def verCursos():
-    authMart = hotmart.auth(userEmail, userPass)
+    authMart = hotmart.auth(USER_EMAIL, USER_PASS)
     cursosValidos = hotmart.getCursos(authMart)
 
     print("Cursos disponíveis para download:")
@@ -147,58 +154,82 @@ def verCursos():
     for index, curso in enumerate(cursosValidos, start=1):
         print("\t", index, curso['nome'])
 
-    opcao = int(input( f"Qual curso deseja baixar? {Colors.Magenta}(0 para todos!){Colors.Reset}\n")) - 1
+    OPCAO = int(input( f"Qual curso deseja baixar? {Colors.Magenta}(0 para todos!){Colors.Reset}\n")) - 1
 
-    if opcao == -1:
+    if OPCAO == -1:
         global maxCursos
         maxCursos = len(cursosValidos)
 
         for curso in cursosValidos:
             baixarCurso(authMart, curso, True)
     else:
-        baixarCurso(authMart, cursosValidos[opcao], False)
+        baixarCurso(authMart, cursosValidos[OPCAO], False)
 
 def criaTempFolder():
-    currFolder = os.path.abspath(os.getcwd())
-    tempFolder = currFolder
+    CURRENT_FOLDER = os.path.abspath(os.getcwd())
+    tempFolder = CURRENT_FOLDER
 
     while os.path.isdir(tempFolder):
-        folderName = ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
-        tempFolder = os.path.join(currFolder, 'temp', folderName)
+        FOLDER_NAME = ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
+        tempFolder = os.path.join(CURRENT_FOLDER, 'temp', FOLDER_NAME)
 
         if not os.path.isdir(tempFolder):
-            os.makedirs(tempFolder)
+            try:
+                os.makedirs(tempFolder)
+            except:
+                pass
             return tempFolder
 
 def baixarCurso(authMart, infoCurso, dAll):
-    tempFolder = criaTempFolder()
+    TEMP_FOLDER = criaTempFolder()
 
-    nmcurso = re.sub(r'[<>:!"/\\|?*]', '', infoCurso['nome']
-                     ).strip().replace('.', '').replace("\t", "")
-    if not os.path.exists('Cursos/' + nmcurso):
-        os.makedirs('Cursos/' + nmcurso)
+    NOME_CURSO = re.sub(
+        r'[<>:!"/\\|?*]', 
+        '',
+        infoCurso['nome']) \
+        .strip() \
+        .replace('.', '') \
+        .replace("\t", "")
+
+    pathCurso = os.path.join(
+        os.path.abspath(os.getcwd()),
+        'Cursos',
+        NOME_CURSO )
+
+    if not os.path.exists(pathCurso):
+        try:
+            os.makedirs(pathCurso)
+        except:
+            pass
     
     clearScreen()
 
     if dAll:
         global maxCursos
         global cursoAtual
+
         print(
             f"{Colors.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
         cursoAtual += 1
-    dominio = infoCurso['resource']['subdomain']
-    youtube_dl.utils.std_headers['Referer'] = f"https://{dominio}.club.hotmart.com/"
-    authMart.headers['accept'] = 'application/json, text/plain, */*'
-    authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com/'
-    authMart.headers['referer'] = f'https://{dominio}.club.hotmart.com/'
-    authMart.headers['club'] = dominio
-    authMart.headers['pragma'] = 'no-cache'
-    authMart.headers['cache-control'] = 'no-cache'
-    curso = authMart.get(
-        'https://api-club.hotmart.com/hot-club-api/rest/v3/navigation').json()
-    print(f"Baixando o curso: {Colors.Cyan}{Colors.Bold}{nmcurso}{Colors.Reset} (pressione {Colors.Magenta}ctrl+c{Colors.Reset} a qualquer momento para {Colors.Red}cancelar{Colors.Reset})")
+
+    DOMINIO = infoCurso['resource']['subdomain']
+    URL = f"https://{DOMINIO}.club.hotmart.com/"
+
+    youtube_dl.utils.std_headers['Referer'] = URL
+
+    authMart.headers['accept'] = CONTENT_TYPE
+    authMart.headers['origin'] = URL
+    authMart.headers['referer'] = URL
+    authMart.headers['club'] = DOMINIO
+    authMart.headers['pragma'] = NO_CACHE
+    authMart.headers['cache-control'] = NO_CACHE
+
+    curso = authMart.get(f'{HOTMART_API}/navigation').json()
+
+    print(f"Baixando o curso: {Colors.Cyan}{Colors.Bold}{NOME_CURSO}{Colors.Reset} (pressione {Colors.Magenta}ctrl+c{Colors.Reset} a qualquer momento para {Colors.Red}cancelar{Colors.Reset})")
+    
     # Descomentar para ver o que caralhos a plataforma dá de json de curso
-    # with open('data.json', 'w', encoding='utf-8') as f:
+    # with open('data.json', 'w', encoding=ENCODING) as f:
     #     json.dump(curso, f, ensure_ascii=False, indent=4)
     moduleCount = 0
     lessonCount = 0
@@ -212,23 +243,24 @@ def baixarCurso(authMart, infoCurso, dAll):
     linksLongos = 0
     anexosLongos = 0
     videosInexistentes = 0
+
     try:
-        for module in curso['modules']:
-            nmModulo = f"{module['moduleOrder']}. " + re.sub(
-                r'[<>:!"/\\|?*]', '', module['name']).strip().replace('.', '').replace("\t", "")
-            if not os.path.exists(f"Cursos/{nmcurso}/{nmModulo}"):
+        for modulo in curso['modules']:
+            nmModulo = f"{modulo['moduleOrder']}. " + re.sub(
+                r'[<>:!"/\\|?*]', '', modulo['name']).strip().replace('.', '').replace("\t", "")
+            if not os.path.exists(f"Cursos/{NOME_CURSO}/{nmModulo}"):
                 try:
-                    os.makedirs(f"Cursos/{nmcurso}/{nmModulo}")
+                    os.makedirs(f"Cursos/{NOME_CURSO}/{nmModulo}")
                 except:
                     pass
             moduleCount += 1
-            for aula in module['pages']:
+            for aula in modulo['pages']:
                 nmAula = f"{aula['pageOrder']}. " + re.sub(
                     r'[<>:!"/\\|?*]', '', aula['name']).strip().replace('.', '').replace("\t", "")
                 print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{nmModulo}{Colors.Magenta}/{Colors.Green}{nmAula}{Colors.Magenta}!{Colors.Reset}")
-                if not os.path.exists(f"Cursos/{nmcurso}/{nmModulo}/{nmAula}"):
+                if not os.path.exists(f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}"):
                     try:
-                        os.makedirs(f"Cursos/{nmcurso}/{nmModulo}/{nmAula}")
+                        os.makedirs(f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}")
                     except:
                         pass
                 lessonCount += 1
@@ -237,19 +269,19 @@ def baixarCurso(authMart, infoCurso, dAll):
                     try:
                         infoGetter = authMart
                         infoAula = infoGetter.get(
-                            f'https://api-club.hotmart.com/hot-club-api/rest/v3/page/{aula["hash"]}').json()
+                            f'{HOTMART_API}/page/{aula["hash"]}').json()
                         break
                     except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = Hotmart.auth(userEmail, userPass)
-                        authMart.headers['accept'] = 'application/json, text/plain, */*'
-                        authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com/'
-                        authMart.headers['referer'] = f'https://{dominio}.club.hotmart.com/'
-                        authMart.headers['club'] = dominio
-                        authMart.headers['pragma'] = 'no-cache'
-                        authMart.headers['cache-control'] = 'no-cache'
+                        authMart = Hotmart.auth(USER_EMAIL, USER_PASS)
+                        authMart.headers['accept'] = CONTENT_TYPE
+                        authMart.headers['origin'] = URL
+                        authMart.headers['referer'] = URL
+                        authMart.headers['club'] = DOMINIO
+                        authMart.headers['pragma'] = NO_CACHE
+                        authMart.headers['cache-control'] = NO_CACHE
                         continue
                 # Descomentar para ver o que caralhos a plataforma retorna na página
-                # with open('aula.json', 'w', encoding='utf-8') as f:
+                # with open('aula.json', 'w', encoding=ENCODING) as f:
                 #     json.dump(infoAula, f, ensure_ascii=False, indent=4)
 
                 # Download Aulas Nativas (HLS)
@@ -274,17 +306,17 @@ def baixarCurso(authMart, infoCurso, dAll):
                                         # TODO Melhorar esse workaround para nome longo
                                         filePath = os.path.dirname(
                                             os.path.abspath(__file__))
-                                        aulaPath = f"{filePath}/Cursos/{nmcurso}/{nmModulo}/{nmAula}/aula-{x}.mp4"
+                                        aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4"
                                         if len(aulaPath) > 254:
-                                            if not os.path.exists(f"Cursos/{nmcurso}/ev"):
+                                            if not os.path.exists(f"Cursos/{NOME_CURSO}/ev"):
                                                 os.makedirs(
-                                                    f"Cursos/{nmcurso}/ev")
+                                                    f"Cursos/{NOME_CURSO}/ev")
                                             tempNM = ''.join(random.choices(
                                                 string.ascii_uppercase + string.digits, k=8))
-                                            with open(f"Cursos/{nmcurso}/ev/list.txt", "a", encoding="utf-8") as safelist:
+                                            with open(f"Cursos/{NOME_CURSO}/ev/list.txt", "a", encoding=ENCODING) as safelist:
                                                 safelist.write(
-                                                    f"{tempNM} = {nmcurso}/{nmModulo}/{nmAula}/aula-{x}.mp4\n")
-                                            aulaPath = f"Cursos/{nmcurso}/ev/{tempNM}.mp4"
+                                                    f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4\n")
+                                            aulaPath = f"Cursos/{NOME_CURSO}/ev/{tempNM}.mp4"
                                             videosLongos += 1
                                         if not os.path.isfile(aulaPath):
                                             videoData = aulagetter.get(
@@ -303,7 +335,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                                             if highestQual is not None:
                                                 videoData = aulagetter.get(
                                                     f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['player']['cloudFrontSignature']}")
-                                                with open(f'{tempFolder}/dump.m3u8', 'w') as dump:
+                                                with open(f'{TEMP_FOLDER}/dump.m3u8', 'w') as dump:
                                                     dump.write(videoData.text)
                                                 videoPlaylist = m3u8.loads(
                                                     videoData.text)
@@ -316,12 +348,12 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                     uri = segment.uri
                                                     frag = aulagetter.get(
                                                         f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['player']['cloudFrontSignature']}")
-                                                    with open(f"{tempFolder}/" + uri, 'wb') as sfrag:
+                                                    with open(f"{TEMP_FOLDER}/" + uri, 'wb') as sfrag:
                                                         sfrag.write(
                                                             frag.content)
                                                 fragkey = aulagetter.get(
                                                     f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['player']['cloudFrontSignature']}")
-                                                with open(f"{tempFolder}/{key}", 'wb') as skey:
+                                                with open(f"{TEMP_FOLDER}/{key}", 'wb') as skey:
                                                     skey.write(fragkey.content)
                                                 print(
                                                     f"\r\tSegmentos baixados, gerando video final! {Colors.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Colors.Reset}", end="\n", flush=True)
@@ -329,7 +361,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 # TODO Implementar verificação de hardware acceleration
                                                 # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
-                                                ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{aulaPath}"'
+                                                ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {TEMP_FOLDER}/dump.m3u8 -n "{aulaPath}"'
 
                                                 if sys.platform.startswith('darwin'):
                                                     # MacOs specific procedures
@@ -348,7 +380,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 print(
                                                     f"Download da aula {Colors.Bold}{Colors.Magenta}{nmModulo}/{nmAula}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
                                                 time.sleep(3)
-                                                for ff in glob.glob(f"{tempFolder}/*"):
+                                                for ff in glob.glob(f"{TEMP_FOLDER}/*"):
                                                     os.remove(ff)
 
                                             else:
@@ -373,16 +405,16 @@ def baixarCurso(authMart, infoCurso, dAll):
 
                                     filePath = os.path.dirname(
                                         os.path.abspath(__file__))
-                                    aulaPath = f"{filePath}/Cursos/{nmcurso}/{nmModulo}/{nmAula}/aula-{x}.mp4"
+                                    aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4"
                                     if len(aulaPath) > 254:
-                                        if not os.path.exists(f"Cursos/{nmcurso}/ev"):
-                                            os.makedirs(f"Cursos/{nmcurso}/ev")
+                                        if not os.path.exists(f"Cursos/{NOME_CURSO}/ev"):
+                                            os.makedirs(f"Cursos/{NOME_CURSO}/ev")
                                         tempNM = ''.join(random.choices(
                                             string.ascii_uppercase + string.digits, k=8))
-                                        with open(f"Cursos/{nmcurso}/ev/list.txt", "a", encoding="utf-8") as safelist:
+                                        with open(f"Cursos/{NOME_CURSO}/ev/list.txt", "a", encoding=ENCODING) as safelist:
                                             safelist.write(
-                                                f"{tempNM} = {nmcurso}/{nmModulo}/{nmAula}/aula-{x}.mp4\n")
-                                        aulaPath = f"Cursos/{nmcurso}/ev/{tempNM}.mp4"
+                                                f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4\n")
+                                        aulaPath = f"Cursos/{NOME_CURSO}/ev/{tempNM}.mp4"
                                         videosLongos += 1
 
                                     if not os.path.isfile(aulaPath):
@@ -433,9 +465,9 @@ def baixarCurso(authMart, infoCurso, dAll):
                                             except:
                                                 print(
                                                     f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
-                                                with open(f"Cursos/{nmcurso}/erros.txt", "a", encoding="utf-8") as elog:
+                                                with open(f"Cursos/{NOME_CURSO}/erros.txt", "a", encoding=ENCODING) as elog:
                                                     elog.write(
-                                                        f"{linkV} - {nmcurso}/{nmModulo}/{nmAula}")
+                                                        f"{linkV} - {NOME_CURSO}/{nmModulo}/{nmAula}")
                                                 videosInexistentes += 1
                                     else:
                                         vidCount += 1
@@ -454,20 +486,20 @@ def baixarCurso(authMart, infoCurso, dAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{nmcurso}/{nmModulo}/{nmAula}/desc.html"
+                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/desc.html"
                                 if len(aulaPath) > 254:
-                                    if not os.path.exists(f"Cursos/{nmcurso}/ed"):
-                                        os.makedirs(f"Cursos/{nmcurso}/ed")
+                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/ed"):
+                                        os.makedirs(f"Cursos/{NOME_CURSO}/ed")
                                     tempNM = ''.join(random.choices(
                                         string.ascii_uppercase + string.digits, k=8))
-                                    with open(f"Cursos/{nmcurso}/ed/list.txt", "a", encoding="utf-8") as safelist:
+                                    with open(f"Cursos/{NOME_CURSO}/ed/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
-                                            f"{tempNM} = {nmcurso}/{nmModulo}/{nmAula}/desc.html\n")
-                                    aulaPath = f"Cursos/{nmcurso}/ed/{tempNM}.html"
+                                            f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/desc.html\n")
+                                    aulaPath = f"Cursos/{NOME_CURSO}/ed/{tempNM}.html"
                                     descLongas += 1
 
                                 if not os.path.isfile(f"{aulaPath}"):
-                                    with open(f"{aulaPath}", "w", encoding="utf-8") as desct:
+                                    with open(f"{aulaPath}", "w", encoding=ENCODING) as desct:
                                         desct.write(infoAula['content'])
                                         print(
                                             f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
@@ -485,22 +517,22 @@ def baixarCurso(authMart, infoCurso, dAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{nmcurso}/{nmModulo}/{nmAula}/Materiais/{att['fileName']}"
+                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/Materiais/{att['fileName']}"
                                 if len(aulaPath) > 254:
-                                    if not os.path.exists(f"Cursos/{nmcurso}/et"):
-                                        os.makedirs(f"Cursos/{nmcurso}/et")
+                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/et"):
+                                        os.makedirs(f"Cursos/{NOME_CURSO}/et")
                                     tempNM = ''.join(random.choices(
                                         string.ascii_uppercase + string.digits, k=8))
-                                    with open(f"Cursos/{nmcurso}/et/list.txt", "a", encoding="utf-8") as safelist:
+                                    with open(f"Cursos/{NOME_CURSO}/et/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
-                                            f"{tempNM} = {nmcurso}/{nmModulo}/{nmAula}/Materiais/{att['fileName']}\n")
-                                    aulaPath = f"Cursos/{nmcurso}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
+                                            f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/Materiais/{att['fileName']}\n")
+                                    aulaPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
                                     anexosLongos += 1
 
                                 try:
-                                    if not os.path.exists(f"Cursos/{nmcurso}/{nmModulo}/{nmAula}/Materiais"):
+                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/Materiais"):
                                         os.makedirs(
-                                            f"Cursos/{nmcurso}/{nmModulo}/{nmAula}/Materiais")
+                                            f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/Materiais")
                                 except:
                                     pass
 
@@ -510,7 +542,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                                             try:
                                                 attGetter = authMart
                                                 anexo = attGetter.get(
-                                                    f"https://api-club.hotmart.com/hot-club-api/rest/v3/attachment/{att['fileMembershipId']}/download").json()
+                                                    f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
                                                 anexo = requests.get(
                                                     anexo['directDownloadUrl'])
                                             except KeyError:
@@ -540,23 +572,23 @@ def baixarCurso(authMart, infoCurso, dAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{nmcurso}/{nmModulo}/{nmAula}/links.txt"
+                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/links.txt"
                                 if len(aulaPath) > 254:
-                                    if not os.path.exists(f"Cursos/{nmcurso}/el"):
-                                        os.makedirs(f"Cursos/{nmcurso}/el")
+                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/el"):
+                                        os.makedirs(f"Cursos/{NOME_CURSO}/el")
                                     tempNM = ''.join(random.choices(
                                         string.ascii_uppercase + string.digits, k=8))
-                                    with open(f"Cursos/{nmcurso}/el/list.txt", "a", encoding="utf-8") as safelist:
+                                    with open(f"Cursos/{NOME_CURSO}/el/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
-                                            f"{tempNM} = {nmcurso}/{nmModulo}/{nmAula}/links.txt\n")
-                                    aulaPath = f"Cursos/{nmcurso}/el/links.txt"
+                                            f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/links.txt\n")
+                                    aulaPath = f"Cursos/{NOME_CURSO}/el/links.txt"
                                     linksLongos += 1
 
                                 if not os.path.isfile(f"{aulaPath}"):
                                     print(
                                         f"{Colors.Magenta}Link Complementar encontrado!{Colors.Reset}")
                                     for link in infoAula['complementaryReadings']:
-                                        with open(f"{aulaPath}", "a", encoding="utf-8") as linkz:
+                                        with open(f"{aulaPath}", "a", encoding=ENCODING) as linkz:
                                             linkz.write(f"{link}\n")
 
                                 else:
@@ -567,21 +599,21 @@ def baixarCurso(authMart, infoCurso, dAll):
                             pass
 
                     except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = Hotmart.auth(userEmail, userPass)
-                        authMart.headers['accept'] = 'application/json, text/plain, */*'
-                        authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com/'
-                        authMart.headers['referer'] = f'https://{dominio}.club.hotmart.com/'
-                        authMart.headers['club'] = dominio
-                        authMart.headers['pragma'] = 'no-cache'
-                        authMart.headers['cache-control'] = 'no-cache'
+                        authMart = Hotmart.auth(USER_EMAIL, USER_PASS)
+                        authMart.headers['accept'] = CONTENT_TYPE
+                        authMart.headers['origin'] = URL
+                        authMart.headers['referer'] = URL
+                        authMart.headers['club'] = DOMINIO
+                        authMart.headers['pragma'] = NO_CACHE
+                        authMart.headers['cache-control'] = NO_CACHE
                         tryDL -= 1
                         continue
                     break
     except KeyError:
         print(f"\t{Colors.Red}Recurso sem módulos!{Colors.Reset}")
 
-    with open(f"Cursos/{nmcurso}/info.txt", "w", encoding="utf-8") as nfo:
-        nfo.write(f"""Info sobre o rip do curso: {nmcurso} ({f'https://{dominio}.club.hotmart.com/'})
+    with open(f"Cursos/{NOME_CURSO}/info.txt", "w", encoding=ENCODING) as nfo:
+        nfo.write(f"""Info sobre o rip do curso: {NOME_CURSO} ({URL})
     Data do rip: {datetime.datetime.today().strftime('%d/%m/%Y')}
     Quantidade de recursos/erros (na run que completou):
         Quantidade de Módulos: {moduleCount};
@@ -611,12 +643,12 @@ def baixarCurso(authMart, infoCurso, dAll):
     Script utilizado para download feito por Katinho ;)
     Versão do script: 3.8.4""")
 
-    for f in glob.glob(f"{tempFolder}/*"):
+    for f in glob.glob(f"{TEMP_FOLDER}/*"):
         os.remove(f)
 
     time.sleep(3)
 
-    os.rmdir(tempFolder)
+    os.rmdir(TEMP_FOLDER)
 
     if not dAll:
         verCursos()
