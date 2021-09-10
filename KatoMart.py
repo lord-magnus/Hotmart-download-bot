@@ -54,28 +54,85 @@ elif sys.platform.startswith('win32'):
     # Windows specific procedures
     os.system("cls")
 
-class C:
-    # Essa classe é puramente estética servindo para colorir as informações exibidas pelo programa
-    # print(f"Total errors this run: {C.Red if a > 0 else C.Green}{a}")
+class Cores:
+    """ANSI Escape codes for the console output with colors and rich text.
+
+    How to use: print(f"Total errors this run: {Cores.Red if a > 0 else Cores.Green}{a}")
+    Read more also: 
+        * https://en.wikipedia.org/wiki/ANSI_escape_code
+        * https://www.lihaoyi.com/post/BuildyourownCommandLinewithANSIescapecodes.html
+        * https://gist.github.com/arlm/f624561b2cd3f53cb26112f3e48f97cd
+        * https://www.ecma-international.org/publications-and-standards/standards/ecma-48/
+
+    Attributes:
+        Reset (str): Reset colors.
+        Bold (str): Makes text bold.
+        Underline (str): Underlines text.
+        Red (str): Red foreground text.
+        Green (str): Green foreground text.
+        Yellow (str): Yellow foreground text.
+        Blue (str): Blue foreground text.
+        Magenta (str): Magenta foreground text.
+        Cyan (str): Cyan foreground text.
+        bgRed (str): Red background.
+        bgGreen (str): Green background.
+        bgYellow (str): Yellow background.
+        bgBlue (str): Blue background.
+        bgMagenta (str): Magenta background.
+        bgCyan (str): Cyan background.
+        bgWhite (str): White background.
+    """
+    
     Reset = '\u001b[0m'
+    """Reset colors ANSI Escape code.
+    """
     Bold = '\u001b[1m'
+    """Makes text bold ANSI Escape code.
+    """
     Underline = '\u001b[4m'
+    """Underlines text ANSI Escape code.
+    """
 
     Red = '\u001b[31m'
+    """Red foreground text ANSI Escape code.
+    """
     Green = '\u001b[32m'
+    """Green foreground text ANSI Escape code.
+    """
     Yellow = '\u001b[33m'
+    """Yellow foreground text ANSI Escape code.
+    """
     Blue = '\u001b[34m'
+    """Blue foreground text ANSI Escape code.
+    """
     Magenta = '\u001b[35m'
+    """Magenta foreground text ANSI Escape code.
+    """
     Cyan = '\u001b[36m'
+    """Cyan foreground text ANSI Escape code.
+    """
 
     bgRed = '\u001b[41m'
+    """Red background ANSI Escape code.
+    """
     bgGreen = '\u001b[42m'
+    """Green background ANSI Escape code.
+    """
     bgYellow = '\u001b[43m'
+    """Yellow background ANSI Escape code.
+    """
     bgBlue = '\u001b[44m'
+    """Blue background ANSI Escape code.
+    """
     bgMagenta = '\u001b[45m'
+    """Magenta background ANSI Escape code.
+    """
     bgCyan = '\u001b[46m'
+    """Cyan background ANSI Escape code.
+    """
     bgWhite = '\u001b[47m'
-
+    """White background ANSI Escape code.
+    """
 
 def auth():
     global userEmail
@@ -91,7 +148,7 @@ def auth():
         authMart.headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.106 Safari/537.36'
         authMart.headers['authorization'] = f"Bearer {authSparkle['access_token']}"
     except KeyError:
-        print(f"{C.Red}{C.Bold}Tentativa de login falhou! Verifique os dados ou contate o @katomaro (Telegram){C.Reset}")
+        print(f"{Cores.Red}{Cores.Bold}Tentativa de login falhou! Verifique os dados ou contate o @katomaro (Telegram){Cores.Reset}")
         exit(13)
     return authMart
 
@@ -115,7 +172,8 @@ def verCursos():
     print("Cursos disponíveis para download:")
     for i, curso in enumerate(cursosValidos, start=1):
         print("\t", i, curso['nome'])
-    opcao = int(input(f"Qual curso deseja baixar? {C.Magenta}(0 para todos!){C.Reset}\n")) - 1
+    opcao = int(input(
+        f"Qual curso deseja baixar? {Cores.Magenta}(0 para todos!){Cores.Reset}\n")) - 1
     if opcao == -1:
         global maxCursos
         maxCursos = len(cursosValidos)
@@ -148,7 +206,8 @@ def baixarCurso(authMart, infoCurso, dAll):
     if dAll:
         global maxCursos
         global cursoAtual
-        print(f"{C.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
+        print(
+            f"{Cores.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
         cursoAtual += 1
     dominio = infoCurso['resource']['subdomain']
     youtube_dl.utils.std_headers['Referer'] = f"https://{dominio}.club.hotmart.com/"
@@ -159,7 +218,7 @@ def baixarCurso(authMart, infoCurso, dAll):
     authMart.headers['pragma'] = 'no-cache'
     authMart.headers['cache-control'] = 'no-cache'
     curso = authMart.get('https://api-club.hotmart.com/hot-club-api/rest/v3/navigation').json()
-    print(f"Baixando o curso: {C.Cyan}{C.Bold}{nmcurso}{C.Reset} (pressione {C.Magenta}ctrl+c{C.Reset} a qualquer momento para {C.Red}cancelar{C.Reset})")
+    print(f"Baixando o curso: {Cores.Cyan}{Cores.Bold}{nmcurso}{Cores.Reset} (pressione {Cores.Magenta}ctrl+c{Cores.Reset} a qualquer momento para {Cores.Red}cancelar{Cores.Reset})")
     # Descomentar para ver o que caralhos a plataforma dá de json de curso
     # with open('data.json', 'w', encoding='utf-8') as f:
     #     json.dump(curso, f, ensure_ascii=False, indent=4)
@@ -186,7 +245,7 @@ def baixarCurso(authMart, infoCurso, dAll):
             moduleCount += 1
             for aula in module['pages']:
                 nmAula = f"{aula['pageOrder']}. " + re.sub(r'[<>:!"/\\|?*]', '', aula['name']).strip().replace('.', '').replace("\t", "")
-                print(f"{C.Magenta}Tentando baixar a aula: {C.Cyan}{nmModulo}{C.Magenta}/{C.Green}{nmAula}{C.Magenta}!{C.Reset}")
+                print(f"{Cores.Magenta}Tentando baixar a aula: {Cores.Cyan}{nmModulo}{Cores.Magenta}/{Cores.Green}{nmAula}{Cores.Magenta}!{Cores.Reset}")
                 if not os.path.exists(f"Cursos/{nmcurso}/{nmModulo}/{nmAula}"):
                     try:
                         os.makedirs(f"Cursos/{nmcurso}/{nmModulo}/{nmAula}")
@@ -219,7 +278,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                         try:
                             for x, media in enumerate(infoAula['mediasSrc'], start=1):
                                 if media['mediaType'] == "VIDEO":
-                                    print(f"\t{C.Magenta}Tentando baixar o vídeo {x}{C.Reset}")
+                                    print(
+                                        f"\t{Cores.Magenta}Tentando baixar o vídeo {x}{Cores.Reset}")
                                     aulagetter = authMart
                                     playerData = aulagetter.get(media['mediaSrcUrl']).text
                                     # Descomentar para ver o que caralhos a plataforma retorna do player
@@ -260,8 +320,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 key = videoPlaylist.segments[0].key.uri
                                                 totalSegmentos = videoPlaylist.segments[-1].uri.split(".")[0].split("-")[1]
                                                 for segment in videoPlaylist.segments:
-                                                    print(f"\r\tBaixando o segmento {C.Blue}{segment.uri.split('.')[0].split('-')[1]}{C.Reset}/{C.Magenta}{totalSegmentos}{C.Reset}!",
-                                                        end="", flush=True)
+                                                    print(f"\r\tBaixando o segmento {Cores.Blue}{segment.uri.split('.')[0].split('-')[1]}{Cores.Reset}/{Cores.Magenta}{totalSegmentos}{Cores.Reset}!",
+                                                          end="", flush=True)
                                                     uri = segment.uri
                                                     frag = aulagetter.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['player']['cloudFrontSignature']}")
                                                     with open(f"{tempFolder}/" + uri, 'wb') as sfrag:
@@ -269,8 +329,9 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 fragkey = aulagetter.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['player']['cloudFrontSignature']}")
                                                 with open(f"{tempFolder}/{key}", 'wb') as skey:
                                                     skey.write(fragkey.content)
-                                                print(f"\r\tSegmentos baixados, gerando video final! {C.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){C.Reset}",end="\n", flush=True)
-                                                
+                                                print(
+                                                    f"\r\tSegmentos baixados, gerando video final! {Cores.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Cores.Reset}", end="\n", flush=True)
+
                                                 # TODO Implementar verificação de hardware acceleration
                                                 # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
@@ -289,18 +350,20 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 #     pass
 
                                                 vidCount += 1
-                                                print(f"Download da aula {C.Bold}{C.Magenta}{nmModulo}/{nmAula}{C.Reset} {C.Green}concluído{C.Reset}!")
+                                                print(
+                                                    f"Download da aula {Cores.Bold}{Cores.Magenta}{nmModulo}/{nmAula}{Cores.Reset} {Cores.Green}concluído{Cores.Reset}!")
                                                 time.sleep(3)
                                                 for ff in glob.glob(f"{tempFolder}/*"):
                                                     os.remove(ff)
 
                                             else:
-                                                print(f"{C.Red}{C.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{C.Reset}")
+                                                print(
+                                                    f"{Cores.Red}{Cores.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{Cores.Reset}")
                                                 raise HTTPError
                                         else:
                                             print("VIDEO JA EXISTE")
                                             vidCount += 1
-                                        
+
                                     # tryDL = 0
 
                         # Download de aula Externa
@@ -331,7 +394,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                     "outtmpl": f"{aulaPath}"}
 
                                         if 'player.vimeo' in i.get("src"):
-                                            fonteExterna = f"{C.Cyan}Vimeo{C.Reset}"
+                                            fonteExterna = f"{Cores.Cyan}Vimeo{Cores.Reset}"
                                             if "?" in i.get("src"):
                                                 linkV = i.get("src").split("?")[0]
                                             else:
@@ -340,8 +403,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 linkV = linkV.split("/")[-1]
 
                                         elif 'vimeo.com' in i.get("src"):
-                                            fonteExterna = f"{C.Cyan}Vimeo{C.Reset}"
                                             vimeoID = i.get("src").split('vimeo.com/')[1]
+                                            fonteExterna = f"{Cores.Cyan}Vimeo{Cores.Reset}"
                                             if "?" in vimeoID:
                                                 vimeoID = vimeoID.split("?")[0]
                                             linkV = "https://player.vimeo.com/video/" + vimeoID
@@ -355,18 +418,20 @@ def baixarCurso(authMart, infoCurso, dAll):
                                             raise KeyError
 
                                         elif "youtube.com" in i.get("src") or "youtu.be" in i.get("src"):
-                                            fonteExterna = f"{C.Red}YouTube{C.Reset}"
+                                            fonteExterna = f"{Cores.Red}YouTube{Cores.Reset}"
                                             linkV = i.get("src")
 
                                         if fonteExterna is not None:
-                                            print(f"{C.Magenta}Baixando aula externa de fonte: {fonteExterna}!")
+                                            print(
+                                                f"{Cores.Magenta}Baixando aula externa de fonte: {fonteExterna}!")
                                             try:
                                                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                                                     ydl.download([linkV])
                                                 vidCount += 1
                                             # TODO especificar os erros de Live Agendada(YouTube) e Video Inexistente
                                             except:
-                                                print(f"{C.Red}O vídeo é uma Live Agendada, ou, foi apagado!{C.Reset}")
+                                                print(
+                                                    f"{Cores.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Cores.Reset}")
                                                 with open(f"Cursos/{nmcurso}/erros.txt", "a", encoding="utf-8") as elog:
                                                     elog.write(f"{linkV} - {nmcurso}/{nmModulo}/{nmAula}")
                                                 videosInexistentes += 1
@@ -376,7 +441,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                                 # tryDL = 0
 
                             except KeyError:
-                                print(f"{C.Bold}{C.Red}Ué, erro ao salvar essa aula, pulada!{C.Reset} (verifique se ela tem vídeo desbloqueado na plataforma)")
+                                print(
+                                    f"{Cores.Bold}{Cores.Red}Ué, erro ao salvar essa aula, pulada!{Cores.Reset} (verifique se ela tem vídeo desbloqueado na plataforma)")
                                 tryDL = 0
 
                         # Count Descrições
@@ -398,7 +464,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                                 if not os.path.isfile(f"{aulaPath}"):
                                     with open(f"{aulaPath}", "w", encoding="utf-8") as desct:
                                         desct.write(infoAula['content'])
-                                        print(f"{C.Magenta}Descrição da aula salva!{C.Reset}")
+                                        print(
+                                            f"{Cores.Magenta}Descrição da aula salva!{Cores.Reset}")
                                 descCount += 1
 
                         except KeyError:
@@ -407,7 +474,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                         # Count Anexos
                         try:
                             for att in infoAula['attachments']:
-                                print(f"{C.Magenta}Tentando baixar o anexo: {C.Red}{att['fileName']}{C.Reset}")
+                                print(
+                                    f"{Cores.Magenta}Tentando baixar o anexo: {Cores.Red}{att['fileName']}{Cores.Reset}")
                                 # TODO Mesmo trecho de aula longa zzz
 
                                 filePath = os.path.dirname(os.path.abspath(__file__))
@@ -445,7 +513,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                                                 del vrum
                                             with open(f"{aulaPath}", 'wb') as ann:
                                                 ann.write(anexo.content)
-                                                print(f"{C.Magenta}Anexo baixado com sucesso!{C.Reset}")
+                                                print(
+                                                    f"{Cores.Magenta}Anexo baixado com sucesso!{Cores.Reset}")
                                             break
                                         except:
                                             pass
@@ -470,13 +539,15 @@ def baixarCurso(authMart, infoCurso, dAll):
                                     linksLongos += 1
 
                                 if not os.path.isfile(f"{aulaPath}"):
-                                    print(f"{C.Magenta}Link Complementar encontrado!{C.Reset}")
+                                    print(
+                                        f"{Cores.Magenta}Link Complementar encontrado!{Cores.Reset}")
                                     for link in infoAula['complementaryReadings']:
                                         with open(f"{aulaPath}", "a", encoding="utf-8") as linkz:
                                             linkz.write(f"{link}\n")
 
                                 else:
-                                    print(f"{C.Green}Os Links já estavam presentes!{C.Reset}")
+                                    print(
+                                        f"{Cores.Green}Os Links já estavam presentes!{Cores.Reset}")
                             linkCount += 1
                         except KeyError:
                             pass
@@ -493,7 +564,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                         continue
                     break
     except KeyError:
-        print(f"\t{C.Red}Recurso sem módulos!{C.Reset}")
+        print(f"\t{Cores.Red}Recurso sem módulos!{Cores.Reset}")
 
     with open(f"Cursos/{nmcurso}/info.txt", "w", encoding="utf-8") as nfo:
         nfo.write(f"""Info sobre o rip do curso: {nmcurso} ({f'https://{dominio}.club.hotmart.com/'})
@@ -528,7 +599,7 @@ def baixarCurso(authMart, infoCurso, dAll):
 
     for f in glob.glob(f"{tempFolder}/*"):
         os.remove(f)
-    
+
     time.sleep(3)
 
     os.rmdir(tempFolder)
