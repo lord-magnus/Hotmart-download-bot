@@ -213,6 +213,27 @@ def criaSubDir(parentDir, order, nome):
 
     return (cleanName, dirPath)
 
+def getInfoAula(dominio, url, hash):
+    #  TODO Melhorar isso lol
+    infoAula = None
+
+    while True:
+        try:
+            infoAula = authMart \
+                .get(f'{HOTMART_API}/page/{hash}') \
+                .json()
+            break
+        except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
+            authMart = hotmart.auth(USER_EMAIL, USER_PASS)
+            authMart.headers['accept'] = CONTENT_TYPE
+            authMart.headers['origin'] = url
+            authMart.headers['referer'] = url
+            authMart.headers['club'] = dominio
+            authMart.headers['pragma'] = NO_CACHE
+            authMart.headers['cache-control'] = NO_CACHE
+            continue
+
+    return infoAula
 
 def baixarCurso(authMart, infoCurso, downloadAll):
     TEMP_FOLDER = criaTempFolder()
@@ -271,22 +292,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                 print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{NOME_MODULO}{Colors.Magenta}/{Colors.Green}{NOME_AULA}{Colors.Magenta}!{Colors.Reset}")
                 
                 lessonCount += 1
-                #  TODO Melhorar isso lol
-                while True:
-                    try:
-                        infoGetter = authMart
-                        infoAula = infoGetter.get(
-                            f'{HOTMART_API}/page/{aula["hash"]}').json()
-                        break
-                    except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = Hotmart.auth(USER_EMAIL, USER_PASS)
-                        authMart.headers['accept'] = CONTENT_TYPE
-                        authMart.headers['origin'] = URL
-                        authMart.headers['referer'] = URL
-                        authMart.headers['club'] = DOMINIO
-                        authMart.headers['pragma'] = NO_CACHE
-                        authMart.headers['cache-control'] = NO_CACHE
-                        continue
+                infoAula = getInfoAula(DOMINIO, URL, hash)
+
                 # Descomentar para ver o que caralhos a plataforma retorna na página
                 # with open('aula.json', 'w', encoding=ENCODING) as f:
                 #     json.dump(infoAula, f, ensure_ascii=False, indent=4)
