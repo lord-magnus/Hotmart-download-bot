@@ -232,7 +232,7 @@ def criaVideo(PATH_CURSO, PATH_AULA, index):
 
     return videoPath
 
-def getInfoAula(dominio, url, hash):
+def getInfoAula(authMart, dominio, url, hash):
     #  TODO Melhorar isso lol
     infoAula = None
 
@@ -304,8 +304,12 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
     moduleCount = 0
     lessonCount = 0
+
     vidCount = 0
+    videosLongos = 0
+    videosInexistentes = 0
     segVideos = 0
+    
     descCount = 0
     attCount = 0
     linkCount = 0
@@ -324,7 +328,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                 print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{NOME_MODULO}{Colors.Magenta}/{Colors.Green}{NOME_AULA}{Colors.Magenta}!{Colors.Reset}")
 
                 lessonCount += 1
-                infoAula = getInfoAula(DOMINIO, URL, hash)
+                infoAula = getInfoAula(authMart, DOMINIO, URL, aula["hash"])
 
                 # Descomentar para ver o que caralhos a plataforma retorna na página
                 # with open('aula.json', 'w', encoding=ENCODING) as f:
@@ -354,21 +358,19 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                     success = None
 
                                     if not os.path.isfile(videoPath):
-                                        sucess = downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
+                                        success = downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
                                     else:
                                         print("VIDEO JA EXISTE")
                                         success = True
 
-                                    if sucess:
+                                    if success:
                                         vidCount += 1
-
                                 # tryDL = 0
 
                         # Download de aula Externa
                         except KeyError:
-                            videos, videosLongos, videosInexistentes = downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
+                            videos, videosLongos, videosInexistentes = downloadVideoExterno(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
                             vidCount += videos
-
 
                         # Count Descrições
                         try:
@@ -545,7 +547,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
         verCursos()
 
 
-def downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
+def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, infoAula):
     try:
         fonteExterna = None
         videosLongos = 0
@@ -557,7 +559,7 @@ def downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AU
 
         for index, iFrame in enumerate(iFrames, start=1):
             # TODO Mesmo trecho de aula longa
-            videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
+            videoPath = criaVideo(pathCurso, pathAula, index)
 
             # TODO Melhorar esse workaround para nome longo
             if len(videoPath) > 254:
@@ -614,8 +616,9 @@ def downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AU
                     except:
                         print(f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
 
-                        with open(f"Cursos/{NOME_CURSO}/erros.txt", "a", encoding=ENCODING) as elog:
-                            elog.write( f"{videoLink} - {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}")
+                        errorPath = os.path.join(pathCurso, "erros.txt")
+                        with open(errorPath, "a", encoding=ENCODING) as elog:
+                            elog.write( f"{videoLink} - {nomeCurso}/{nomeModulo}/{NomeAula}")
 
                         videosInexistentes += 1
             else:
@@ -630,7 +633,7 @@ def downloadVideoExterno(NOME_CURSO, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AU
     return vidCount, videosLongos, videosInexistentes
 
 
-def downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset):
+def downloadVideoNativo(authMart, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
     try:
         videoData = authMart.get(
             f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
@@ -647,7 +650,7 @@ def downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInf
         if highestQual is not None:
             videoData = authMart.get(
                 f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
-            with open(f'{TEMP_FOLDER}/dump.m3u8', 'w') as dump:
+            with open(f'{tempFolder}/dump.m3u8', 'w') as dump:
                 dump.write(videoData.text)
             videoPlaylist = m3u8.loads(
                 videoData.text)
@@ -660,12 +663,12 @@ def downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInf
                 uri = segment.uri
                 frag = authMart.get(
                     f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
-                with open(f"{TEMP_FOLDER}/" + uri, 'wb') as sfrag:
+                with open(f"{tempFolder}/" + uri, 'wb') as sfrag:
                     sfrag.write(
                         frag.content)
             fragkey = authMart.get(
                 f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
-            with open(f"{TEMP_FOLDER}/{key}", 'wb') as skey:
+            with open(f"{tempFolder}/{key}", 'wb') as skey:
                 skey.write(fragkey.content)
             print(
                 f"\r\tSegmentos baixados, gerando video final! {Colors.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Colors.Reset}", end="\n", flush=True)
@@ -673,7 +676,7 @@ def downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInf
             # TODO Implementar verificação de hardware acceleration
             # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
-            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {TEMP_FOLDER}/dump.m3u8 -n "{aulaPath}"'
+            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{aulaPath}"'
 
             if sys.platform.startswith('darwin'):
                 # MacOs specific procedures
@@ -689,9 +692,9 @@ def downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInf
                 #     pass
 
             print(
-                f"Download da aula {Colors.Bold}{Colors.Magenta}{NOME_MODULO}/{NOME_AULA}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
+                f"Download da aula {Colors.Bold}{Colors.Magenta}{nomeModulo}/{nomeAula}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
             time.sleep(3)
-            for ff in glob.glob(f"{TEMP_FOLDER}/*"):
+            for ff in glob.glob(f"{tempFolder}/*"):
                 os.remove(ff)
 
         else:
