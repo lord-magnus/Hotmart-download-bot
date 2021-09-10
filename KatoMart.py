@@ -1,3 +1,25 @@
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#            Esse script faz parte de um projeto bem maior, solto no momento pq quero feedback, de tudo.              #
+#         Também preciso que ele seja testado contra diversos cursos e que os problemas sejam apresentados.           #
+#                                          Meu telegram: @katomaro                                                    #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+# Antes de mais nada, instale o FFMPEG no sistema (adicionando-o às variáveis de ambiente)
+# Após isso, verifique se instalou as dependências listadas abaixo, pelo pip:
+# m3u8, beautifulsoup4, youtube_dl
+# Feito isso, só rodar esse .py
+# Features esperadas nessa versão:
+# # Baixa apenas coisas que não tiveram o download completado anteriormente (com algumas excessões, tipo links.txt)
+# # (Se a conexão for perdida em um download do vimeo/youtube, arquivos residuais ficaram na pasta, devem ser apagados
+# # Ou seja, aulas hospedadas na hotmart, no vimeo e no youtube
+# # Baixa os anexos, salva os links (leitura complementar) e as descrições
+# # Mantém tudo salvo na organização da plataforma (<<DEVE SER VERIFICADA A ORDENAÇÃO DE MÓDULOS)
+#
+# Se algo de estranho acontecer ou se precisar de ajuda, chama no telegram
+# # Possivelmente precisarei dos arquivos "log.txt" e do "debug.txt", saiba que o log na pasta raiz tem info de login usada
+# # Já o "log.txt" dentro da pasta do curso apenas indica as ações do bot, fácil para acompanhar junto com o "debug.txt"
+
 import random
 import string
 import datetime
@@ -21,7 +43,7 @@ userEmail = input("Qual o seu Email da Hotmart?\n")
 userPass = input("Qual a sua senha da Hotmart?\n")
 maxCursos = 0
 cursoAtual = 1
-os.system("cls||clear")
+os.system("cls")
 
 
 class C:
@@ -107,7 +129,7 @@ def baixarCurso(authMart, infoCurso, dAll):
     nmcurso = re.sub(r'[<>:!"/\\|?*]', '', infoCurso['nome']).strip().replace('.', '').replace("\t", "")
     if not os.path.exists('Cursos/' + nmcurso):
         os.makedirs('Cursos/' + nmcurso)
-    os.system("cls||clear")
+    os.system('cls')
     if dAll:
         global maxCursos
         global cursoAtual
