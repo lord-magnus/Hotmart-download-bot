@@ -101,36 +101,58 @@ class Hotmart:
             exit(13)
         return authMart
 
+    def getProdutos(authMart):
+        return authMart.get(
+            'https://api-sec-vlc.hotmart.com/security/oauth/check_token',
+            params={'token': authMart.headers['authorization'].split(" ")[1]}) \
+            .json()['resources']
+
+    def getCursos(authMart):
+        produtos = getProdutos(authMart)
+        cursosValidos = []
+
+        for produto in produtos:
+            try:
+                if produto['resource']['status'] == "ACTIVE" or "STUDENT" in produto['roles']:
+                    dominio = produto['resource']['subdomain']
+
+                    authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com'
+                    authMart.headers['referer'] = authMart.headers['origin']
+                    authMart.headers['club'] = dominio
+
+                    membership = authMart.get('https://api-club.hotmart.com/hot-club-api/rest/v3/membership?attach_token=false') \
+                        .json()['name']
+
+                    produto["nome"] = re.sub(r'[<>:!"/\\|?*]', '', ) \
+                        .strip() \
+                        .replace(".", "") \
+                        .replace("\t", "")
+
+                    cursosValidos.append(produto)
+            except KeyError:
+                continue
+
+        return cursosValidos
+
 def verCursos():
     authMart = Hotmart.auth(userEmail, userPass)
-    produtos = authMart.get('https://api-sec-vlc.hotmart.com/security/oauth/check_token',
-                            params={'token': authMart.headers['authorization'].split(" ")[1]}).json()['resources']
-    cursosValidos = []
-    for i in produtos:
-        try:
-            if i['resource']['status'] == "ACTIVE" or "STUDENT" in i['roles']:
-                dominio = i['resource']['subdomain']
-                authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com'
-                authMart.headers['referer'] = f'https://{dominio}.club.hotmart.com'
-                authMart.headers['club'] = dominio
-                i["nome"] = re.sub(r'[<>:!"/\\|?*]', '', authMart.get('https://api-club.hotmart.com/hot-club-api/rest/v3/membership?attach_token=false').json()[
-                                   'name']).strip().replace(".", "").replace("\t", "")
-                cursosValidos.append(i)
-        except KeyError:
-            continue
+    cursosValidos = Hotmart.getCursos(authMart)
+
     print("Cursos disponíveis para download:")
+
     for i, curso in enumerate(cursosValidos, start=1):
         print("\t", i, curso['nome'])
-    opcao = int(input(
-        f"Qual curso deseja baixar? {Colors.Magenta}(0 para todos!){Colors.Reset}\n")) - 1
+
+    opcao = int(input( f"Qual curso deseja baixar? {Colors.Magenta}(0 para todos!){Colors.Reset}\n")) - 1
+
     if opcao == -1:
         global maxCursos
         maxCursos = len(cursosValidos)
+
         for curso in cursosValidos:
             baixarCurso(authMart, curso, True)
     else:
         baixarCurso(authMart, cursosValidos[opcao], False)
-
 
 def baixarCurso(authMart, infoCurso, dAll):
     while True:
