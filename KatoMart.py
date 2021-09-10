@@ -56,28 +56,34 @@ elif sys.platform.startswith('win32'):
     # Windows specific procedures
     os.system("cls")
 
-def auth():
-    global userEmail
-    global userPass
-    authMart = requests.session()
-    authMart.headers[
-        'user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.106 Safari/537.36'
-    data = {'username': userEmail,
-            'password': userPass, 'grant_type': 'password'}
-    authSparkle = authMart.post(
-        'https://api.sparkleapp.com.br/oauth/token', data=data)
-    authSparkle = authSparkle.json()
-    try:
-        authMart.headers.clear()
-        authMart.headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.106 Safari/537.36'
-        authMart.headers['authorization'] = f"Bearer {authSparkle['access_token']}"
-    except KeyError:
-        print(f"{Colors.Red}{Colors.Bold}Tentativa de login falhou! Verifique os dados ou contate o @katomaro (Telegram){Colors.Reset}")
-        exit(13)
-    return authMart
+class Hotmart:
+
+    def auth(userEmail, userPass):
+        authMart = requests.session()
+        authMart.headers[ 'user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.106 Safari/537.36'
+
+        data = {
+            'username': userEmail,
+            'password': userPass, 
+            'grant_type': 'password'
+        }
+
+        authSparkle = authMart.post(
+            'https://api.sparkleapp.com.br/oauth/token', data=data)
+
+        authSparkle = authSparkle.json()
+
+        try:
+            authMart.headers.clear()
+            authMart.headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.106 Safari/537.36'
+            authMart.headers['authorization'] = f"Bearer {authSparkle['access_token']}"
+        except KeyError:
+            print(f"{Colors.Red}{Colors.Bold}Tentativa de login falhou! Verifique os dados ou contate o @katomaro (Telegram){Colors.Reset}")
+            exit(13)
+        return authMart
 
 def verCursos():
-    authMart = auth()
+    authMart = Hotmart.auth(userEmail, userPass)
     produtos = authMart.get('https://api-sec-vlc.hotmart.com/security/oauth/check_token',
                             params={'token': authMart.headers['authorization'].split(" ")[1]}).json()['resources']
     cursosValidos = []
@@ -189,7 +195,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                             f'https://api-club.hotmart.com/hot-club-api/rest/v3/page/{aula["hash"]}').json()
                         break
                     except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = auth()
+                        authMart = Hotmart.auth(userEmail, userPass)
                         authMart.headers['accept'] = 'application/json, text/plain, */*'
                         authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com/'
                         authMart.headers['referer'] = f'https://{dominio}.club.hotmart.com/'
@@ -516,7 +522,7 @@ def baixarCurso(authMart, infoCurso, dAll):
                             pass
 
                     except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = auth()
+                        authMart = Hotmart.auth(userEmail, userPass)
                         authMart.headers['accept'] = 'application/json, text/plain, */*'
                         authMart.headers['origin'] = f'https://{dominio}.club.hotmart.com/'
                         authMart.headers['referer'] = f'https://{dominio}.club.hotmart.com/'
