@@ -1,4 +1,6 @@
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# coding=utf-8
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #            Esse script faz parte de um projeto bem maior, solto no momento pq quero feedback, de tudo.              #
 #         Também preciso que ele seja testado contra diversos cursos e que os problemas sejam apresentados.           #
 #                                          Meu telegram: @katomaro                                                    #
