@@ -25,9 +25,7 @@
 import random
 import string
 import datetime
-
 import requests
-from bs4 import BeautifulSoup
 import re
 import glob
 import youtube_dl
@@ -37,6 +35,8 @@ import m3u8
 import json
 import subprocess
 import sys
+
+from bs4 import BeautifulSoup
 
 from requests import HTTPError, Timeout
 from requests.exceptions import ChunkedEncodingError, ContentDecodingError
@@ -49,12 +49,13 @@ userPass = input("Qual a sua senha da Hotmart?\n")
 maxCursos = 0
 cursoAtual = 1
 
-if sys.platform.startswith('darwin'):
-    # MacOs specific procedures
-    os.system("clear")
-elif sys.platform.startswith('win32'):
-    # Windows specific procedures
-    os.system("cls")
+def clearScreen():
+    if sys.platform.startswith('darwin'):
+        # MacOs specific procedures
+        os.system("clear")
+    elif sys.platform.startswith('win32'):
+        # Windows specific procedures
+        os.system("cls")
 
 class Hotmart:
 
@@ -127,13 +128,8 @@ def baixarCurso(authMart, infoCurso, dAll):
                      ).strip().replace('.', '').replace("\t", "")
     if not os.path.exists('Cursos/' + nmcurso):
         os.makedirs('Cursos/' + nmcurso)
-
-    if sys.platform.startswith('darwin'):
-        # MacOs specific procedures
-        os.system("clear")
-    elif sys.platform.startswith('win32'):
-        # Windows specific procedures
-        os.system("cls")
+    
+    clearScreen()
 
     if dAll:
         global maxCursos
@@ -576,5 +572,5 @@ def baixarCurso(authMart, infoCurso, dAll):
     if not dAll:
         verCursos()
 
-
+clearScreen()
 verCursos()
