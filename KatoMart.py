@@ -124,10 +124,7 @@ class Hotmart:
                     .get(f'{HOTMART_API}/membership?attach_token=false') \
                     .json()['name']
 
-                produto["nome"] = re.sub(r'[<>:!"/\\|?*]', '', membership) \
-                    .strip() \
-                    .replace(".", "") \
-                    .replace("\t", "")
+                produto["nome"] = limpaString(membership) 
 
                 cursosValidos.append(produto)
             except KeyError:
@@ -182,16 +179,21 @@ def criaTempFolder():
     
     return tempFolder
 
-def criaCursoFolder(nome):
-    NOME_CURSO = re.sub(r'[<>:!"/\\|?*]', '', nome) \
+def limpaString(string):
+    result = re.sub(r'[<>:!"/\\|?*]', '', string) \
         .strip() \
         .replace('.', '') \
         .replace("\t", "")
 
+    return result
+
+def criaCurso(nome):
+    nomeCurso = limpaString(nome)
+
     pathCurso = os.path.join(
         os.path.abspath(os.getcwd()),
         'Cursos',
-        NOME_CURSO )
+        nomeCurso)
 
     if not os.path.exists(pathCurso):
         try:
@@ -199,11 +201,22 @@ def criaCursoFolder(nome):
         except:
             pass
 
-    return pathCurso
+    return (nomeCurso, pathCurso)
+
+def criaSubDir(parentDir, order, nome):
+    cleanName = f"{order}. " + limpaString(nome)
+
+    dirPath = os.path.join(parentDir, cleanName)
+
+    if not os.path.exists(dirPath):
+        os.makedirs(dirPath)
+
+    return (cleanName, dirPath)
+
 
 def baixarCurso(authMart, infoCurso, downloadAll):
     TEMP_FOLDER = criaTempFolder()
-    PATH_CURSO = criaCursoFolder(infoCurso['nome'])
+    NOME_CURSO, PATH_CURSO = criaCurso(infoCurso['nome'])
     
     clearScreen()
 
@@ -233,7 +246,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
     # Descomentar para ver o que caralhos a plataforma dá de json de curso
     # with open('data.json', 'w', encoding=ENCODING) as f:
     #     json.dump(curso, f, ensure_ascii=False, indent=4)
-    
+
     moduleCount = 0
     lessonCount = 0
     vidCount = 0
@@ -249,23 +262,14 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
     try:
         for modulo in curso['modules']:
-            nmModulo = f"{modulo['moduleOrder']}. " + re.sub(
-                r'[<>:!"/\\|?*]', '', modulo['name']).strip().replace('.', '').replace("\t", "")
-            if not os.path.exists(f"Cursos/{NOME_CURSO}/{nmModulo}"):
-                try:
-                    os.makedirs(f"Cursos/{NOME_CURSO}/{nmModulo}")
-                except:
-                    pass
+            NOME_MODULO, PATH_MODULO = criaSubDir(PATH_CURSO, modulo['moduleOrder'], modulo['name'])
+
             moduleCount += 1
             for aula in modulo['pages']:
-                nmAula = f"{aula['pageOrder']}. " + re.sub(
-                    r'[<>:!"/\\|?*]', '', aula['name']).strip().replace('.', '').replace("\t", "")
-                print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{nmModulo}{Colors.Magenta}/{Colors.Green}{nmAula}{Colors.Magenta}!{Colors.Reset}")
-                if not os.path.exists(f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}"):
-                    try:
-                        os.makedirs(f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}")
-                    except:
-                        pass
+                NOME_AULA, PATH_AULA = criaSubDir(PATH_MODULO, aula['pageOrder'], aula['name'])
+
+                print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{NOME_MODULO}{Colors.Magenta}/{Colors.Green}{NOME_AULA}{Colors.Magenta}!{Colors.Reset}")
+                
                 lessonCount += 1
                 #  TODO Melhorar isso lol
                 while True:
@@ -309,7 +313,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                         # TODO Melhorar esse workaround para nome longo
                                         filePath = os.path.dirname(
                                             os.path.abspath(__file__))
-                                        aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4"
+                                        aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{x}.mp4"
                                         if len(aulaPath) > 254:
                                             if not os.path.exists(f"Cursos/{NOME_CURSO}/ev"):
                                                 os.makedirs(
@@ -318,7 +322,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                                 string.ascii_uppercase + string.digits, k=8))
                                             with open(f"Cursos/{NOME_CURSO}/ev/list.txt", "a", encoding=ENCODING) as safelist:
                                                 safelist.write(
-                                                    f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4\n")
+                                                    f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{x}.mp4\n")
                                             aulaPath = f"Cursos/{NOME_CURSO}/ev/{tempNM}.mp4"
                                             videosLongos += 1
                                         if not os.path.isfile(aulaPath):
@@ -381,7 +385,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                                 vidCount += 1
                                                 print(
-                                                    f"Download da aula {Colors.Bold}{Colors.Magenta}{nmModulo}/{nmAula}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
+                                                    f"Download da aula {Colors.Bold}{Colors.Magenta}{NOME_MODULO}/{NOME_AULA}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
                                                 time.sleep(3)
                                                 for ff in glob.glob(f"{TEMP_FOLDER}/*"):
                                                     os.remove(ff)
@@ -408,7 +412,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                     filePath = os.path.dirname(
                                         os.path.abspath(__file__))
-                                    aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4"
+                                    aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{x}.mp4"
                                     if len(aulaPath) > 254:
                                         if not os.path.exists(f"Cursos/{NOME_CURSO}/ev"):
                                             os.makedirs(f"Cursos/{NOME_CURSO}/ev")
@@ -416,7 +420,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                             string.ascii_uppercase + string.digits, k=8))
                                         with open(f"Cursos/{NOME_CURSO}/ev/list.txt", "a", encoding=ENCODING) as safelist:
                                             safelist.write(
-                                                f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/aula-{x}.mp4\n")
+                                                f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/aula-{x}.mp4\n")
                                         aulaPath = f"Cursos/{NOME_CURSO}/ev/{tempNM}.mp4"
                                         videosLongos += 1
 
@@ -470,7 +474,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                                     f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
                                                 with open(f"Cursos/{NOME_CURSO}/erros.txt", "a", encoding=ENCODING) as elog:
                                                     elog.write(
-                                                        f"{linkV} - {NOME_CURSO}/{nmModulo}/{nmAula}")
+                                                        f"{linkV} - {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}")
                                                 videosInexistentes += 1
                                     else:
                                         vidCount += 1
@@ -489,7 +493,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/desc.html"
+                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html"
                                 if len(aulaPath) > 254:
                                     if not os.path.exists(f"Cursos/{NOME_CURSO}/ed"):
                                         os.makedirs(f"Cursos/{NOME_CURSO}/ed")
@@ -497,7 +501,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                         string.ascii_uppercase + string.digits, k=8))
                                     with open(f"Cursos/{NOME_CURSO}/ed/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
-                                            f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/desc.html\n")
+                                            f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
                                     aulaPath = f"Cursos/{NOME_CURSO}/ed/{tempNM}.html"
                                     descLongas += 1
 
@@ -520,7 +524,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/Materiais/{att['fileName']}"
+                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}"
                                 if len(aulaPath) > 254:
                                     if not os.path.exists(f"Cursos/{NOME_CURSO}/et"):
                                         os.makedirs(f"Cursos/{NOME_CURSO}/et")
@@ -528,14 +532,14 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                         string.ascii_uppercase + string.digits, k=8))
                                     with open(f"Cursos/{NOME_CURSO}/et/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
-                                            f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/Materiais/{att['fileName']}\n")
+                                            f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}\n")
                                     aulaPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
                                     anexosLongos += 1
 
                                 try:
-                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/Materiais"):
+                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais"):
                                         os.makedirs(
-                                            f"Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/Materiais")
+                                            f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais")
                                 except:
                                     pass
 
@@ -575,7 +579,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                                 filePath = os.path.dirname(
                                     os.path.abspath(__file__))
-                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{nmModulo}/{nmAula}/links.txt"
+                                aulaPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt"
                                 if len(aulaPath) > 254:
                                     if not os.path.exists(f"Cursos/{NOME_CURSO}/el"):
                                         os.makedirs(f"Cursos/{NOME_CURSO}/el")
@@ -583,7 +587,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                                         string.ascii_uppercase + string.digits, k=8))
                                     with open(f"Cursos/{NOME_CURSO}/el/list.txt", "a", encoding=ENCODING) as safelist:
                                         safelist.write(
-                                            f"{tempNM} = {NOME_CURSO}/{nmModulo}/{nmAula}/links.txt\n")
+                                            f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt\n")
                                     aulaPath = f"Cursos/{NOME_CURSO}/el/links.txt"
                                     linksLongos += 1
 
@@ -602,7 +606,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                             pass
 
                     except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = Hotmart.auth(USER_EMAIL, USER_PASS)
+                        authMart = hotmart.auth(USER_EMAIL, USER_PASS)
                         authMart.headers['accept'] = CONTENT_TYPE
                         authMart.headers['origin'] = URL
                         authMart.headers['referer'] = URL
