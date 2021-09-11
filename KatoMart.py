@@ -93,7 +93,7 @@ class Hotmart:
             authMart.headers['user-agent'] = self._USER_AGENT
             authMart.headers['authorization'] = f"Bearer {authSparkle['access_token']}"
         except KeyError:
-            print(f"{Colors.Red}{Colors.Bold}Tentativa de login falhou! Verifique os dados ou contate o @katomaro (Telegram){Colors.Reset}")
+            print(f"{Colors.Red}{Colors.Bold}Tentativa de login falhou! Verifique o repositório em https://github.com/katomaro/Hotmart-download-bot{Colors.Reset}")
             exit(13)
         return authMart
 
@@ -183,7 +183,8 @@ def limpaString(string):
     result = re.sub(r'[<>:!"/\\|?*]', '', string) \
         .strip() \
         .replace('.', '') \
-        .replace("\t", "")
+        .replace("\t", "") \
+        .replace("\n", "")
 
     return result
 
@@ -533,8 +534,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
     A enumeração pode parecer estar faltando coisas, mas geralmente não está, a hotmart que a entrega de forma cagada.
 
-    Script utilizado para download feito por Katinho ;)
-    Versão do script: 3.8.4""")
+    O script utilizado para download pode ser encontrado no seguinte link:
+    https://github.com/katomaro/Hotmart-download-bot""")
 
     for f in glob.glob(f"{TEMP_FOLDER}/*"):
         os.remove(f)
@@ -597,7 +598,7 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
                     fonteExterna = None
                     # fonteExterna = f"{C.Yellow}Wistia{C.Reset}"
                     # Preciso de um curso que tenha aula do Wistia para ver como tá sendo dado
-                    # :( Ajuda noix Telegram: @katomaro
+                    # :( Ajuda noix  se possuir curso com esse player Telegram: @katomaro
                     raise KeyError
 
                 elif "youtube.com" in iFrame.get("src") or "youtu.be" in iFrame.get("src"):
