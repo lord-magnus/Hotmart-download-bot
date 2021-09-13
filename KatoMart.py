@@ -308,13 +308,15 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                 while tryDL:
                     try:
                         try:
-                            videos, videosLongos, segVideos = downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
-                            vidCount += videos
+                           # videos, videosLongos, segVideos = downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
+                           # vidCount += videos
+                            pass
 
                         # Download de aula Externa
                         except KeyError:
-                            videos, videosLongos, videosInexistentes = downloadVideoExterno(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
-                            vidCount += videos
+                           # videos, videosLongos, videosInexistentes = downloadVideoExterno(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                           # vidCount += videos
+                           pass
 
                         # Count Descrições
                         try:
@@ -428,25 +430,28 @@ def downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, inf
 
     if infoAula['complementaryReadings']:
         # TODO Mesmo trecho de aula longa zzz
-        filePath = os.path.dirname(os.path.abspath(__file__))
-        videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt"
+        linksPath =  os.path.join(PATH_AULA, "links.txt")
 
-        if len(videoPath) > 254:
-            if not os.path.exists(f"Cursos/{NOME_CURSO}/el"):
-                os.makedirs(f"Cursos/{NOME_CURSO}/el")
+        if len(linksPath) > 254:
+            elPath = os.path.join(PATH_CURSO, "el")
+
+            if not os.path.exists(elPath):
+                os.makedirs(elPath)
 
             tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            with open(f"Cursos/{NOME_CURSO}/el/list.txt", "a", encoding=ENCODING) as safelist:
+            listPath = os.path.join(elPath, "list.txt")
+
+            with open(listPath, "a", encoding=ENCODING) as safelist:
                 safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt\n")
 
-            videoPath = f"Cursos/{NOME_CURSO}/el/links.txt"
+            linksPath = f"{elPath}/links.txt"
             linksLongos += 1
 
-        if not os.path.isfile(f"{videoPath}"):
+        if not os.path.isfile(f"{linksPath}"):
             print(f"{Colors.Magenta}Link Complementar encontrado!{Colors.Reset}")
 
             for link in infoAula['complementaryReadings']:
-                with open(f"{videoPath}", "a", encoding=ENCODING) as linkz:
+                with open(f"{linksPath}", "a", encoding=ENCODING) as linkz:
                     linkz.write(f"{link}\n")
 
         else:
@@ -462,29 +467,32 @@ def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO
     for att in infoAula['attachments']:
         print(f"{Colors.Magenta}Tentando baixar o anexo: {Colors.Red}{att['fileName']}{Colors.Reset}")
         # TODO Mesmo trecho de aula longa zzz
+        materiaisPath =  os.path.join(PATH_AULA, "Materiais")
+        attachmentPath = os.path.join(materiaisPath, att['fileName'])
 
-        filePath = os.path.dirname(os.path.abspath(__file__))
-        videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}"
+        if len(attachmentPath) > 254:
+            etPath = os.path.join(PATH_CURSO, "et")
 
-        if len(videoPath) > 254:
-            if not os.path.exists(f"Cursos/{NOME_CURSO}/et"):
-                os.makedirs(f"Cursos/{NOME_CURSO}/et")
+            if not os.path.exists(etPath):
+                os.makedirs(etPath)
 
             tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            listPath = os.path.join(etPath, "list.txt")
 
-            with open(f"Cursos/{NOME_CURSO}/et/list.txt", "a", encoding=ENCODING) as safelist:
+            with open(listPath, "a", encoding=ENCODING) as safelist:
                 safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}\n")
 
-            videoPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
+            fileName = f"{tempNM}.{att['fileName'].split('.')[-1]}"
+            attachmentPath = os.path.join(etPath, fileName)
             anexosLongos += 1
 
         try:
-            if not os.path.exists(f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais"):
-                os.makedirs(f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais")
+            if not os.path.exists(materiaisPath):
+                os.makedirs(materiaisPath)
         except:
             pass
 
-        if not os.path.isfile(f"{videoPath}"):
+        if not os.path.isfile(attachmentPath):
             while True:
                 try:
                     try:
@@ -498,7 +506,8 @@ def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO
                         vrum.headers['token'] = anexo['token']
                         anexo = requests.get(vrum.get(lambdaUrl).text)
                         del vrum
-                    with open(f"{videoPath}", 'wb') as ann:
+
+                    with open(f"{attachmentPath}", 'wb') as ann:
                         ann.write(anexo.content)
                         print(f"{Colors.Magenta}Anexo baixado com sucesso!{Colors.Reset}")
                     break
@@ -606,13 +615,14 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
                     try:
                         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                             ydl.download([videoLink])
+
                         vidCount += 1
 
                         # TODO especificar os erros de Live Agendada(YouTube) e Video Inexistente
                     except:
                         print(f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
-
                         errorPath = os.path.join(pathCurso, "erros.txt")
+
                         with open(errorPath, "a", encoding=ENCODING) as elog:
                             elog.write( f"{videoLink} - {nomeCurso}/{nomeModulo}/{NomeAula}")
 
@@ -630,8 +640,7 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
 
 def downloadVideoNativo(authMart, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
     try:
-        videoData = authMart.get(
-            f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
+        videoData = authMart.get(f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
         masterPlaylist = m3u8.loads(videoData.text)
         res = []
         highestQual = None
