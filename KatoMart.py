@@ -541,7 +541,7 @@ def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PA
             success = None
 
             if not os.path.isfile(videoPath):
-                success = downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
+                success = downloadVideoNativo(authMart, PATH_AULA, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
             else:
                 print("VIDEO JA EXISTE")
                 success = True
@@ -638,54 +638,55 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
 
     return vidCount, videosLongos, videosInexistentes
 
-def downloadVideoNativo(authMart, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
+def downloadVideoNativo(authMart, pathAula, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
     try:
         videoData = authMart.get(f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
         masterPlaylist = m3u8.loads(videoData.text)
         res = []
         highestQual = None
+
         for playlist in masterPlaylist.playlists:
-            res.append(
-                playlist.stream_info.resolution)
+            res.append(playlist.stream_info.resolution)
+
         res.sort(reverse=True)
+
         for playlist in masterPlaylist.playlists:
             if playlist.stream_info.resolution == res[0]:
                 highestQual = playlist.uri
+
         if highestQual is not None:
-            videoData = authMart.get(
-                f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
+            videoData = authMart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
+
             with open(f'{tempFolder}/dump.m3u8', 'w') as dump:
                 dump.write(videoData.text)
-            videoPlaylist = m3u8.loads(
-                videoData.text)
+
+            videoPlaylist = m3u8.loads(videoData.text)
             key = videoPlaylist.segments[0].key.uri
-            totalSegmentos = videoPlaylist.segments[-1].uri.split(".")[
-                0].split("-")[1]
+            totalSegmentos = videoPlaylist.segments[-1].uri.split(".")[0].split("-")[1]
+
             for segment in videoPlaylist.segments:
-                print(f"\r\tBaixando o segmento {Colors.Blue}{segment.uri.split('.')[0].split('-')[1]}{Colors.Reset}/{Colors.Magenta}{totalSegmentos}{Colors.Reset}!",
-                    end="", flush=True)
+                print(f"\r\tBaixando o segmento {Colors.Blue}{segment.uri.split('.')[0].split('-')[1]}{Colors.Reset}/{Colors.Magenta}{totalSegmentos}{Colors.Reset}!", end="", flush=True)
                 uri = segment.uri
-                frag = authMart.get(
-                    f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
+                frag = authMart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
+
                 with open(f"{tempFolder}/" + uri, 'wb') as sfrag:
-                    sfrag.write(
-                        frag.content)
-            fragkey = authMart.get(
-                f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
+                    sfrag.write(frag.content)
+
+            fragkey = authMart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
+
             with open(f"{tempFolder}/{key}", 'wb') as skey:
                 skey.write(fragkey.content)
-            print(
-                f"\r\tSegmentos baixados, gerando video final! {Colors.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Colors.Reset}", end="\n", flush=True)
+
+            print(f"\r\tSegmentos baixados, gerando video final! {Colors.Red}(dependendo da config do pc este passo pode demorar até 20 minutos!){Colors.Reset}", end="\n", flush=True)
 
             # TODO Implementar verificação de hardware acceleration
             # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
-            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{aulaPath}"'
+            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{pathAula}"'
 
             if sys.platform.startswith('darwin'):
                 # MacOs specific procedures
-                subprocess.run(
-                    ffmpegcmd, shell=True)
+                subprocess.run(ffmpegcmd, shell=True)
             elif sys.platform.startswith('win32'):
                 # Windows specific procedures
                 subprocess.run(ffmpegcmd)
@@ -695,15 +696,14 @@ def downloadVideoNativo(authMart, tempFolder, nomeModulo, nomeAula, playerInfo, 
                 # if p.returncode != 0:
                 #     pass
 
-            print(
-                f"Download da aula {Colors.Bold}{Colors.Magenta}{nomeModulo}/{nomeAula}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
+            print(f"Download da aula {Colors.Bold}{Colors.Magenta}{nomeModulo}/{nomeAula}{Colors.Reset} {Colors.Green}concluído{Colors.Reset}!")
             time.sleep(3)
+
             for ff in glob.glob(f"{tempFolder}/*"):
                 os.remove(ff)
-
         else:
-            print(
-                f"{Colors.Red}{Colors.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{Colors.Reset}")
+            print(f"{Colors.Red}{Colors.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{Colors.Reset}")
+            
             raise HTTPError
     except:
         return False
