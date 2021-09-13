@@ -331,34 +331,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                         # Count Links Complementares
                         try:
-                            if infoAula['complementaryReadings']:
-                                # TODO Mesmo trecho de aula longa zzz
-
-                                filePath = os.path.dirname(
-                                    os.path.abspath(__file__))
-                                videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt"
-                                if len(videoPath) > 254:
-                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/el"):
-                                        os.makedirs(f"Cursos/{NOME_CURSO}/el")
-                                    tempNM = ''.join(random.choices(
-                                        string.ascii_uppercase + string.digits, k=8))
-                                    with open(f"Cursos/{NOME_CURSO}/el/list.txt", "a", encoding=ENCODING) as safelist:
-                                        safelist.write(
-                                            f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt\n")
-                                    videoPath = f"Cursos/{NOME_CURSO}/el/links.txt"
-                                    linksLongos += 1
-
-                                if not os.path.isfile(f"{videoPath}"):
-                                    print(
-                                        f"{Colors.Magenta}Link Complementar encontrado!{Colors.Reset}")
-                                    for link in infoAula['complementaryReadings']:
-                                        with open(f"{videoPath}", "a", encoding=ENCODING) as linkz:
-                                            linkz.write(f"{link}\n")
-
-                                else:
-                                    print(
-                                        f"{Colors.Green}Os Links já estavam presentes!{Colors.Reset}")
-                            linkCount += 1
+                            linkCount, linksLongos = downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
                         except KeyError:
                             pass
 
@@ -416,6 +389,39 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
     if not downloadAll:
         verCursos()
+
+def downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+    linkCount = 0
+    linksLongos = 0
+
+    if infoAula['complementaryReadings']:
+        # TODO Mesmo trecho de aula longa zzz
+        filePath = os.path.dirname(os.path.abspath(__file__))
+        videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt"
+
+        if len(videoPath) > 254:
+            if not os.path.exists(f"Cursos/{NOME_CURSO}/el"):
+                os.makedirs(f"Cursos/{NOME_CURSO}/el")
+
+            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            with open(f"Cursos/{NOME_CURSO}/el/list.txt", "a", encoding=ENCODING) as safelist:
+                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt\n")
+
+            videoPath = f"Cursos/{NOME_CURSO}/el/links.txt"
+            linksLongos += 1
+
+        if not os.path.isfile(f"{videoPath}"):
+            print(f"{Colors.Magenta}Link Complementar encontrado!{Colors.Reset}")
+
+            for link in infoAula['complementaryReadings']:
+                with open(f"{videoPath}", "a", encoding=ENCODING) as linkz:
+                    linkz.write(f"{link}\n")
+
+        else:
+            print(f"{Colors.Green}Os Links já estavam presentes!{Colors.Reset}")
+
+    linkCount += 1
+    return linkCount,linksLongos
 
 def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
     anexosLongos = 0
