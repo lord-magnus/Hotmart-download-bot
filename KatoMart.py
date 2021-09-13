@@ -325,58 +325,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                         # Count Anexos
                         try:
-                            for att in infoAula['attachments']:
-                                print(
-                                    f"{Colors.Magenta}Tentando baixar o anexo: {Colors.Red}{att['fileName']}{Colors.Reset}")
-                                # TODO Mesmo trecho de aula longa zzz
-
-                                filePath = os.path.dirname(
-                                    os.path.abspath(__file__))
-                                videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}"
-                                if len(videoPath) > 254:
-                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/et"):
-                                        os.makedirs(f"Cursos/{NOME_CURSO}/et")
-                                    tempNM = ''.join(random.choices(
-                                        string.ascii_uppercase + string.digits, k=8))
-                                    with open(f"Cursos/{NOME_CURSO}/et/list.txt", "a", encoding=ENCODING) as safelist:
-                                        safelist.write(
-                                            f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}\n")
-                                    videoPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
-                                    anexosLongos += 1
-
-                                try:
-                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais"):
-                                        os.makedirs(
-                                            f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais")
-                                except:
-                                    pass
-
-                                if not os.path.isfile(f"{videoPath}"):
-                                    while True:
-                                        try:
-                                            try:
-                                                attGetter = authMart
-                                                anexo = attGetter.get(
-                                                    f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
-                                                anexo = requests.get(
-                                                    anexo['directDownloadUrl'])
-                                            except KeyError:
-                                                vrum = requests.session()
-                                                vrum.headers.update(
-                                                    authMart.headers)
-                                                lambdaUrl = anexo['lambdaUrl']
-                                                vrum.headers['token'] = anexo['token']
-                                                anexo = requests.get(
-                                                    vrum.get(lambdaUrl).text)
-                                                del vrum
-                                            with open(f"{videoPath}", 'wb') as ann:
-                                                ann.write(anexo.content)
-                                                print(
-                                                    f"{Colors.Magenta}Anexo baixado com sucesso!{Colors.Reset}")
-                                            break
-                                        except:
-                                            pass
-                                attCount += 1
+                            attCount, anexosLongos = downloadAttachments(authMart, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
                         except KeyError:
                             pass
 
@@ -467,6 +416,59 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
     if not downloadAll:
         verCursos()
+
+def downloadAttachments(authMart, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+    anexosLongos = 0
+    attCount = 0
+
+    for att in infoAula['attachments']:
+        print(f"{Colors.Magenta}Tentando baixar o anexo: {Colors.Red}{att['fileName']}{Colors.Reset}")
+        # TODO Mesmo trecho de aula longa zzz
+
+        filePath = os.path.dirname(os.path.abspath(__file__))
+        videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}"
+
+        if len(videoPath) > 254:
+            if not os.path.exists(f"Cursos/{NOME_CURSO}/et"):
+                os.makedirs(f"Cursos/{NOME_CURSO}/et")
+
+            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+            with open(f"Cursos/{NOME_CURSO}/et/list.txt", "a", encoding=ENCODING) as safelist:
+                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}\n")
+
+            videoPath = f"Cursos/{NOME_CURSO}/et/{tempNM}.{att['fileName'].split('.')[-1]}"
+            anexosLongos += 1
+
+        try:
+            if not os.path.exists(f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais"):
+                os.makedirs(f"Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais")
+        except:
+            pass
+
+        if not os.path.isfile(f"{videoPath}"):
+            while True:
+                try:
+                    try:
+                        attGetter = authMart
+                        anexo = attGetter.get(f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
+                        anexo = requests.get(anexo['directDownloadUrl'])
+                    except KeyError:
+                        vrum = requests.session()
+                        vrum.headers.update(authMart.headers)
+                        lambdaUrl = anexo['lambdaUrl']
+                        vrum.headers['token'] = anexo['token']
+                        anexo = requests.get(vrum.get(lambdaUrl).text)
+                        del vrum
+                    with open(f"{videoPath}", 'wb') as ann:
+                        ann.write(anexo.content)
+                        print(f"{Colors.Magenta}Anexo baixado com sucesso!{Colors.Reset}")
+                    break
+                except:
+                    pass
+        attCount += 1
+
+    return attCount, anexosLongos
 
 def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
     vidCount = 0
