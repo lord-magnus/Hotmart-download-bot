@@ -318,29 +318,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                         # Count Descrições
                         try:
-                            if infoAula['content']:
-                                # TODO Mesmo trecho de aula longa zzz
-
-                                filePath = os.path.dirname(
-                                    os.path.abspath(__file__))
-                                videoPath = f"{filePath}/Cursos/{NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html"
-                                if len(videoPath) > 254:
-                                    if not os.path.exists(f"Cursos/{NOME_CURSO}/ed"):
-                                        os.makedirs(f"Cursos/{NOME_CURSO}/ed")
-                                    tempNM = ''.join(random.choices(
-                                        string.ascii_uppercase + string.digits, k=8))
-                                    with open(f"Cursos/{NOME_CURSO}/ed/list.txt", "a", encoding=ENCODING) as safelist:
-                                        safelist.write(
-                                            f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
-                                    videoPath = f"Cursos/{NOME_CURSO}/ed/{tempNM}.html"
-                                    descLongas += 1
-
-                                if not os.path.isfile(f"{videoPath}"):
-                                    with open(f"{videoPath}", "w", encoding=ENCODING) as desct:
-                                        desct.write(infoAula['content'])
-                                        print(
-                                            f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
-                                descCount += 1
+                            descCount, descLongas = downloadDescricoes(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
 
                         except KeyError:
                             pass
@@ -524,6 +502,38 @@ def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PA
 
     # tryDL = 0
     return vidCount, videosLongos, segVideos
+
+def downloadDescricoes(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+    descCount = 0
+    descLongas = 0
+
+    if infoAula['content']:
+        # TODO Mesmo trecho de aula longa zzz
+        descPath =  os.path.join(PATH_AULA, "desc.html")
+
+        if len(descPath) > 254:
+            edPath = os.path.join(PATH_CURSO, "ed")
+
+            if not os.path.exists(edPath):
+                os.makedirs(edPath)
+
+            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            listPath = os.path.join(edPath, "list.txt")
+            
+            with open(listPath, "a", encoding=ENCODING) as safelist:
+                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
+
+            descPath = os.path.join(edPath, "{tempNM}.html")
+            descLongas += 1
+
+        if not os.path.isfile(descPath):
+            with open(descPath, "w", encoding=ENCODING) as description:
+                description.write(infoAula['content'])
+                print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
+
+        descCount += 1
+
+    return descCount, descLongas
 
 def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, infoAula):
     try:
