@@ -325,7 +325,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                         # Count Anexos
                         try:
-                            attCount, anexosLongos = downloadAttachments(authMart, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                            attCount, anexosLongos = downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
                         except KeyError:
                             pass
 
@@ -417,7 +417,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
     if not downloadAll:
         verCursos()
 
-def downloadAttachments(authMart, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
     anexosLongos = 0
     attCount = 0
 
