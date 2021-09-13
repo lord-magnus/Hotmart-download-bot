@@ -288,8 +288,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
     try:
         for modulo in curso['modules']:
             NOME_MODULO, PATH_MODULO = criaSubDir(PATH_CURSO, modulo['moduleOrder'], modulo['name'])
-
             moduleCount += 1
+
             for aula in modulo['pages']:
                 NOME_AULA, PATH_AULA = criaSubDir(PATH_MODULO, aula['pageOrder'], aula['name'])
 
@@ -304,36 +304,12 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                 # Download Aulas Nativas (HLS)
                 tryDL = 2
+
                 while tryDL:
                     try:
                         try:
-                            for index, media in enumerate(infoAula['mediasSrc'], start=1):
-                                if media['mediaType'] != "VIDEO":
-                                    continue
-
-                                print(f"\t{Colors.Magenta}Tentando baixar o vídeo {index}{Colors.Reset}")
-
-                                playerInfo = getPlayerInfo(authMart, media)
-                                segVideos += playerInfo['mediaDuration']
-
-                                for asset in playerInfo['assets']:
-                                    videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
-
-                                    # TODO Melhorar esse workaround para nome longo
-                                    if len(videoPath) > 254:
-                                        videosLongos += 1
-
-                                    success = None
-
-                                    if not os.path.isfile(videoPath):
-                                        success = downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
-                                    else:
-                                        print("VIDEO JA EXISTE")
-                                        success = True
-
-                                    if success:
-                                        vidCount += 1
-                                # tryDL = 0
+                            videos, videosLongos, segVideos = downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
+                            vidCount += videos
 
                         # Download de aula Externa
                         except KeyError:
@@ -514,6 +490,40 @@ def baixarCurso(authMart, infoCurso, downloadAll):
     if not downloadAll:
         verCursos()
 
+def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
+    vidCount = 0
+    videosLongos = 0
+    segVideos = 0
+
+    for index, media in enumerate(infoAula['mediasSrc'], start=1):
+        if media['mediaType'] != "VIDEO":
+            continue
+
+        print(f"\t{Colors.Magenta}Tentando baixar o vídeo {index}{Colors.Reset}")
+
+        playerInfo = getPlayerInfo(authMart, media)
+        segVideos += playerInfo['mediaDuration']
+
+        for asset in playerInfo['assets']:
+            videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
+
+            # TODO Melhorar esse workaround para nome longo
+            if len(videoPath) > 254:
+                videosLongos += 1
+
+            success = None
+
+            if not os.path.isfile(videoPath):
+                success = downloadVideoNativo(authMart, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
+            else:
+                print("VIDEO JA EXISTE")
+                success = True
+
+            if success:
+                vidCount += 1
+
+    # tryDL = 0
+    return vidCount, videosLongos, segVideos
 
 def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, infoAula):
     try:
@@ -599,7 +609,6 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
         tryDL = 0
 
     return vidCount, videosLongos, videosInexistentes
-
 
 def downloadVideoNativo(authMart, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
     try:
