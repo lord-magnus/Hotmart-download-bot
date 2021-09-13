@@ -1,5 +1,7 @@
 # coding=utf-8
 
+from __future__ import annotations
+
 import datetime
 import glob
 import json
@@ -40,7 +42,12 @@ class Hotmart:
         ' Chrome/91.0.4472.106 Safari/537.36'
     )
 
-    def auth(self, userEmail, userPass):
+    _authMart = None
+
+    def __init__(self, userEmail, userPass) -> None:
+        self._authMart = self._auth(userEmail, userPass)
+
+    def _auth(self, userEmail, userPass):
         authMart = requests.session()
         authMart.headers['user-agent'] = self._USER_AGENT
 
@@ -62,44 +69,101 @@ class Hotmart:
         except KeyError:
             print(f"{Colors.Red}{Colors.Bold}Tentativa de login falhou! Verifique o repositório em https://github.com/katomaro/Hotmart-download-bot{Colors.Reset}")
             exit(13)
+
         return authMart
 
-    def getProdutos(self, authMart):
+    def getProdutos(self):
         CHECK_TOKEN_URL = 'https://api-sec-vlc.hotmart.com/security/oauth/check_token'
-        TOKEN = authMart.headers['authorization'].split(" ")[1]
+        TOKEN = self._authMart.headers['authorization'].split(" ")[1]
 
-        return authMart.get(CHECK_TOKEN_URL, params={'token': TOKEN}) \
-            .json()['resources']
+        return self.get(CHECK_TOKEN_URL, params={'token': TOKEN}).json()['resources']
 
-    def getCursos(self, authMart):
-        produtos = self.getProdutos(authMart)
+    def getCursos(self):
+        produtos = self.getProdutos()
         cursosValidos = []
 
         for produto in produtos:
             try:
-                if produto['resource']['status'] != "ACTIVE" and "STUDENT" not in produto['roles']:
+                curso = CursoHotmart(self, produto)
+                if curso.STATUS != "ACTIVE" and "STUDENT" not in curso.ROLES:
                     continue
 
-                HOST = produto['resource']['subdomain']
-                URL = f'https://{HOST}.club.hotmart.com'
-
-                authMart.headers['origin'] = URL
-                authMart.headers['referer'] = URL
-                authMart.headers['club'] = HOST
-
-                membership = authMart \
-                    .get(f'{HOTMART_API}/membership?attach_token=false') \
-                    .json()['name']
-
-                produto["nome"] = limpaString(membership) 
-
-                cursosValidos.append(produto)
+                cursosValidos.append(curso)
             except KeyError:
                 continue
 
         return cursosValidos
 
-hotmart = Hotmart()
+    def getInfoAula(self, infoCurso: CursoHotmart, hash):
+        #  TODO Melhorar isso lol
+        infoAula = None
+
+        while True:
+            try:
+                infoAula = self.get(f'{HOTMART_API}/page/{hash}').json()
+                break
+            except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
+                self._authMart = self._auth(USER_EMAIL, USER_PASS)
+                self.setHeaders(infoCurso)
+                continue
+
+        return infoAula
+
+    def getPlayerInfo(self, media):
+        playerData = self.get(media['mediaSrcUrl']).text
+
+        # Descomentar para ver o que caralhos a plataforma retorna do player
+        # with open("player.html", "w") as phtml:
+        #     phtml.write(playerData)
+
+        playerDom = BeautifulSoup(playerData, features="html.parser")
+        configPattern = re.compile("window.playerConfig")
+        playerConfigurations = playerDom .find(text = configPattern)[:-1]
+        playerConfigJson = playerConfigurations.split(" ", 2)[2]
+        playerInfo = json.loads(playerConfigJson)
+
+        return playerInfo['player']
+
+    def get(self, url, params = None):
+        return self._authMart.get(url, params = params)
+
+    def setHeaders(self, infoCurso: CursoHotmart):
+        self._authMart.headers['accept'] = CONTENT_TYPE
+        self._authMart.headers['origin'] = infoCurso._URL
+        self._authMart.headers['referer'] = infoCurso._URL
+        self._authMart.headers['club'] = infoCurso._HOST
+        self._authMart.headers['pragma'] = NO_CACHE
+        self._authMart.headers['cache-control'] = NO_CACHE
+
+    def getHeaders(self):
+        return self._authMart.headers
+
+class CursoHotmart:
+    _HOST = None
+    _URL = None
+    _HOTMART = None
+    _product = None
+
+    STATUS = None
+    ROLES = None
+    NOME = None
+
+    def __init__(self, hotmart: Hotmart, product) -> None:
+        self._product = product
+        self.STATUS = product['resource']['status']
+        self.ROLES = product['roles']
+        self._HOST = product['resource']['subdomain']
+        self._URL = f'https://{self._HOST}.club.hotmart.com'
+        self._HOTMART = hotmart
+
+        hotmart.setHeaders(self)
+        membership = hotmart \
+                    .get(f'{HOTMART_API}/membership?attach_token=false') \
+                    .json()['name']
+
+        self.NOME = limpaString(membership)
+
+hotmart = Hotmart(USER_EMAIL, USER_PASS)
 
 def clearScreen():
     if sys.platform.startswith('darwin'):
@@ -110,13 +174,12 @@ def clearScreen():
         os.system("cls")
 
 def verCursos():
-    authMart = hotmart.auth(USER_EMAIL, USER_PASS)
-    cursosValidos = hotmart.getCursos(authMart)
+    cursosValidos: list[CursoHotmart] = hotmart.getCursos()
 
     print("Cursos disponíveis para download:")
 
     for index, curso in enumerate(cursosValidos, start=1):
-        print("\t", index, curso['nome'])
+        print("\t", index, curso.NOME)
 
     OPCAO = int(input( f"Qual curso deseja baixar? {Colors.Magenta}(0 para todos!){Colors.Reset}\n")) - 1
 
@@ -125,9 +188,9 @@ def verCursos():
         maxCursos = len(cursosValidos)
 
         for curso in cursosValidos:
-            baixarCurso(authMart, curso, True)
+            baixarCurso(curso, True)
     else:
-        baixarCurso(authMart, cursosValidos[OPCAO], False)
+        baixarCurso(cursosValidos[OPCAO], False)
 
 def criaTempFolder():
     CURRENT_FOLDER = os.path.abspath(os.getcwd())
@@ -200,46 +263,9 @@ def criaVideo(PATH_CURSO, PATH_AULA, index):
 
     return videoPath
 
-def getInfoAula(authMart, dominio, url, hash):
-    #  TODO Melhorar isso lol
-    infoAula = None
-
-    while True:
-        try:
-            infoAula = authMart \
-                .get(f'{HOTMART_API}/page/{hash}') \
-                .json()
-            break
-        except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-            authMart = hotmart.auth(USER_EMAIL, USER_PASS)
-            authMart.headers['accept'] = CONTENT_TYPE
-            authMart.headers['origin'] = url
-            authMart.headers['referer'] = url
-            authMart.headers['club'] = dominio
-            authMart.headers['pragma'] = NO_CACHE
-            authMart.headers['cache-control'] = NO_CACHE
-            continue
-
-    return infoAula
-
-def getPlayerInfo(authMart, media):
-    playerData = authMart.get(media['mediaSrcUrl']).text
-
-    # Descomentar para ver o que caralhos a plataforma retorna do player
-    # with open("player.html", "w") as phtml:
-    #     phtml.write(playerData)
-
-    playerDom = BeautifulSoup(playerData, features="html.parser")
-    playerConfigurations = playerDom \
-        .find(text=re.compile("window.playerConfig"))[:-1]
-    playerConfigJson = playerConfigurations.split(" ", 2)[2]
-    playerInfo = json.loads(playerConfigJson)
-
-    return playerInfo['player']
-
-def baixarCurso(authMart, infoCurso, downloadAll):
+def baixarCurso(infoCurso: CursoHotmart, downloadAll):
     TEMP_FOLDER = criaTempFolder()
-    NOME_CURSO, PATH_CURSO = criaCurso(infoCurso['nome'])
+    NOME_CURSO, PATH_CURSO = criaCurso(infoCurso.NOME)
     
     clearScreen()
 
@@ -250,19 +276,10 @@ def baixarCurso(authMart, infoCurso, downloadAll):
         print(f"{Colors.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
         cursoAtual += 1
 
-    DOMINIO = infoCurso['resource']['subdomain']
-    URL = f"https://{DOMINIO}.club.hotmart.com/"
+    youtube_dl.utils.std_headers['Referer'] = infoCurso._URL
+    hotmart.setHeaders(infoCurso)
 
-    youtube_dl.utils.std_headers['Referer'] = URL
-
-    authMart.headers['accept'] = CONTENT_TYPE
-    authMart.headers['origin'] = URL
-    authMart.headers['referer'] = URL
-    authMart.headers['club'] = DOMINIO
-    authMart.headers['pragma'] = NO_CACHE
-    authMart.headers['cache-control'] = NO_CACHE
-
-    curso = authMart.get(f'{HOTMART_API}/navigation').json()
+    curso = hotmart.get(f'{HOTMART_API}/navigation').json()
 
     print(f"Baixando o curso: {Colors.Cyan}{Colors.Bold}{NOME_CURSO}{Colors.Reset} (pressione {Colors.Magenta}ctrl+c{Colors.Reset} a qualquer momento para {Colors.Red}cancelar{Colors.Reset})")
     
@@ -296,7 +313,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                 print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{NOME_MODULO}{Colors.Magenta}/{Colors.Green}{NOME_AULA}{Colors.Magenta}!{Colors.Reset}")
 
                 lessonCount += 1
-                infoAula = getInfoAula(authMart, DOMINIO, URL, aula["hash"])
+                infoAula = hotmart.getInfoAula(infoCurso, aula["hash"])
 
                 # Descomentar para ver o que caralhos a plataforma retorna na página
                 # with open('aula.json', 'w', encoding=ENCODING) as f:
@@ -327,7 +344,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
 
                         # Count Anexos
                         try:
-                            attCount, anexosLongos = downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                            attCount, anexosLongos = downloadAttachments(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
                         except KeyError:
                             pass
 
@@ -338,13 +355,8 @@ def baixarCurso(authMart, infoCurso, downloadAll):
                             pass
 
                     except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        authMart = hotmart.auth(USER_EMAIL, USER_PASS)
-                        authMart.headers['accept'] = CONTENT_TYPE
-                        authMart.headers['origin'] = URL
-                        authMart.headers['referer'] = URL
-                        authMart.headers['club'] = DOMINIO
-                        authMart.headers['pragma'] = NO_CACHE
-                        authMart.headers['cache-control'] = NO_CACHE
+                        hotmart._auth(USER_EMAIL, USER_PASS)
+                        hotmart.setHeaders(infoCurso)
                         tryDL -= 1
                         continue
                     break
@@ -352,7 +364,7 @@ def baixarCurso(authMart, infoCurso, downloadAll):
         print(f"\t{Colors.Red}Recurso sem módulos!{Colors.Reset}")
 
     with open(f"Cursos/{NOME_CURSO}/info.txt", "w", encoding=ENCODING) as nfo:
-        nfo.write(f"""Info sobre o rip do curso: {NOME_CURSO} ({URL})
+        nfo.write(f"""Info sobre o rip do curso: {NOME_CURSO} ({infoCurso._URL})
     Data do rip: {datetime.datetime.today().strftime('%d/%m/%Y')}
     Quantidade de recursos/erros (na run que completou):
         Quantidade de Módulos: {moduleCount};
@@ -460,7 +472,7 @@ def downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, inf
     linkCount += 1
     return linkCount,linksLongos
 
-def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+def downloadAttachments(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
     anexosLongos = 0
     attCount = 0
 
@@ -496,12 +508,11 @@ def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO
             while True:
                 try:
                     try:
-                        attGetter = authMart
-                        anexo = attGetter.get(f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
+                        anexo = hotmart.get(f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
                         anexo = requests.get(anexo['directDownloadUrl'])
                     except KeyError:
                         vrum = requests.session()
-                        vrum.headers.update(authMart.headers)
+                        vrum.headers.update(hotmart.getHeaders())
                         lambdaUrl = anexo['lambdaUrl']
                         vrum.headers['token'] = anexo['token']
                         anexo = requests.get(vrum.get(lambdaUrl).text)
@@ -517,7 +528,7 @@ def downloadAttachments(authMart, PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO
 
     return attCount, anexosLongos
 
-def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
+def downloadVideos(TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
     vidCount = 0
     videosLongos = 0
     segVideos = 0
@@ -528,7 +539,7 @@ def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PA
 
         print(f"\t{Colors.Magenta}Tentando baixar o vídeo {index}{Colors.Reset}")
 
-        playerInfo = getPlayerInfo(authMart, media)
+        playerInfo = hotmart.getPlayerInfo(media)
         segVideos += playerInfo['mediaDuration']
 
         for asset in playerInfo['assets']:
@@ -541,7 +552,7 @@ def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PA
             success = None
 
             if not os.path.isfile(videoPath):
-                success = downloadVideoNativo(authMart, PATH_AULA, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
+                success = downloadVideoNativo(PATH_AULA, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
             else:
                 print("VIDEO JA EXISTE")
                 success = True
@@ -638,9 +649,9 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
 
     return vidCount, videosLongos, videosInexistentes
 
-def downloadVideoNativo(authMart, pathAula, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
+def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
     try:
-        videoData = authMart.get(f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
+        videoData = hotmart.get(f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
         masterPlaylist = m3u8.loads(videoData.text)
         res = []
         highestQual = None
@@ -655,7 +666,7 @@ def downloadVideoNativo(authMart, pathAula, tempFolder, nomeModulo, nomeAula, pl
                 highestQual = playlist.uri
 
         if highestQual is not None:
-            videoData = authMart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
+            videoData = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
 
             with open(f'{tempFolder}/dump.m3u8', 'w') as dump:
                 dump.write(videoData.text)
@@ -667,12 +678,12 @@ def downloadVideoNativo(authMart, pathAula, tempFolder, nomeModulo, nomeAula, pl
             for segment in videoPlaylist.segments:
                 print(f"\r\tBaixando o segmento {Colors.Blue}{segment.uri.split('.')[0].split('-')[1]}{Colors.Reset}/{Colors.Magenta}{totalSegmentos}{Colors.Reset}!", end="", flush=True)
                 uri = segment.uri
-                frag = authMart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
+                frag = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
 
                 with open(f"{tempFolder}/" + uri, 'wb') as sfrag:
                     sfrag.write(frag.content)
 
-            fragkey = authMart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
+            fragkey = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
 
             with open(f"{tempFolder}/{key}", 'wb') as skey:
                 skey.write(fragkey.content)
@@ -703,7 +714,7 @@ def downloadVideoNativo(authMart, pathAula, tempFolder, nomeModulo, nomeAula, pl
                 os.remove(ff)
         else:
             print(f"{Colors.Red}{Colors.Bold}Algo deu errado ao baixar a aula, redefinindo conexão para tentar novamente!{Colors.Reset}")
-            
+
             raise HTTPError
     except:
         return False
