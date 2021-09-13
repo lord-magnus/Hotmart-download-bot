@@ -390,6 +390,38 @@ def baixarCurso(authMart, infoCurso, downloadAll):
     if not downloadAll:
         verCursos()
 
+def downloadDescricoes(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+    descCount = 0
+    descLongas = 0
+
+    if infoAula['content']:
+        # TODO Mesmo trecho de aula longa zzz
+        descPath =  os.path.join(PATH_AULA, "desc.html")
+
+        if len(descPath) > 254:
+            edPath = os.path.join(PATH_CURSO, "ed")
+
+            if not os.path.exists(edPath):
+                os.makedirs(edPath)
+
+            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            listPath = os.path.join(edPath, "list.txt")
+            
+            with open(listPath, "a", encoding=ENCODING) as safelist:
+                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
+
+            descPath = os.path.join(edPath, "{tempNM}.html")
+            descLongas += 1
+
+        if not os.path.isfile(descPath):
+            with open(descPath, "w", encoding=ENCODING) as description:
+                description.write(infoAula['content'])
+                print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
+
+        descCount += 1
+
+    return descCount, descLongas
+
 def downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
     linkCount = 0
     linksLongos = 0
@@ -510,38 +542,6 @@ def downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PA
 
     # tryDL = 0
     return vidCount, videosLongos, segVideos
-
-def downloadDescricoes(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
-    descCount = 0
-    descLongas = 0
-
-    if infoAula['content']:
-        # TODO Mesmo trecho de aula longa zzz
-        descPath =  os.path.join(PATH_AULA, "desc.html")
-
-        if len(descPath) > 254:
-            edPath = os.path.join(PATH_CURSO, "ed")
-
-            if not os.path.exists(edPath):
-                os.makedirs(edPath)
-
-            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            listPath = os.path.join(edPath, "list.txt")
-            
-            with open(listPath, "a", encoding=ENCODING) as safelist:
-                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
-
-            descPath = os.path.join(edPath, "{tempNM}.html")
-            descLongas += 1
-
-        if not os.path.isfile(descPath):
-            with open(descPath, "w", encoding=ENCODING) as description:
-                description.write(infoAula['content'])
-                print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
-
-        descCount += 1
-
-    return descCount, descLongas
 
 def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, infoAula):
     try:
