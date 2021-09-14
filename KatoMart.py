@@ -138,6 +138,19 @@ class Hotmart:
     def getHeaders(self):
         return self._authMart.headers
 
+    def getAttachment(self, att):
+        try:
+            anexo = self.get(f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
+            anexo = requests.get(anexo['directDownloadUrl'])
+        except KeyError:
+            vrum = requests.session()
+            vrum.headers.update(hotmart.getHeaders())
+            lambdaUrl = anexo['lambdaUrl']
+            vrum.headers['token'] = anexo['token']
+            anexo = requests.get(vrum.get(lambdaUrl).text)
+            del vrum
+        return anexo
+
 class CursoHotmart:
     _HOST = None
     _URL = None
@@ -209,6 +222,24 @@ def criaTempFolder():
     
     return tempFolder
 
+def criaCurso(nome):
+    CURRENT_FOLDER = os.path.abspath(os.getcwd())
+    BASE_PATH = criaSubDir(CURRENT_FOLDER, "Cursos")
+    pathCurso = criaSubDir(BASE_PATH, nome)
+
+    return pathCurso
+
+def criaSubDir(parentDir, nome):
+    dirPath = os.path.join(parentDir, nome)
+
+    if not os.path.exists(dirPath):
+        try:
+            os.makedirs(dirPath)
+        except:
+            pass
+
+    return dirPath
+
 def limpaString(string):
     result = re.sub(r'[<>:!"/\\|?*]', '', string) \
         .strip() \
@@ -218,54 +249,43 @@ def limpaString(string):
 
     return result
 
-def criaCurso(nome):
-    nomeCurso = limpaString(nome)
+def criaNome(order, nome):
+    cleanName = f"{order}. " + limpaString(nome)
+    return cleanName
 
-    pathCurso = os.path.join(
-        os.path.abspath(os.getcwd()),
-        'Cursos',
-        nomeCurso)
+def criaArquivo(pathCurso, aula, prefix, name):
+    fileDir = os.path.join(pathCurso, aula)
+    filePath = os.path.join(fileDir, name)
+    fileExtension = os.path.splitext(name)[1][1:].strip() 
+    tempPath = os.path.join(pathCurso, prefix)
 
-    if not os.path.exists(pathCurso):
+    if len(filePath) > 254:
+        if not os.path.exists(tempPath):
+            try:
+                os.makedirs(tempPath)
+            except:
+                pass
+
+        tempName = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        listPath = os.path.join(tempPath , "list.txt")
+
         try:
-            os.makedirs(pathCurso)
+            with open(listPath, "a", encoding=ENCODING) as safelist:
+                safelist.write(f"{tempName} = {aula}\n")
         except:
             pass
 
-    return (nomeCurso, pathCurso)
+        filePath = os.path.join(tempPath , f"{tempName}.${fileExtension}")
+    else:
+        if not os.path.exists(fileDir):
+            os.makedirs(fileDir)
 
-def criaSubDir(parentDir, order, nome):
-    cleanName = f"{order}. " + limpaString(nome)
-
-    dirPath = os.path.join(parentDir, cleanName)
-
-    if not os.path.exists(dirPath):
-        os.makedirs(dirPath)
-
-    return (cleanName, dirPath)
-
-# TODO Melhorar esse workaround para nome longo
-def criaVideo(PATH_CURSO, PATH_AULA, index):
-    videoPath = os.path.join(PATH_AULA , f"aula-{index}.mp4")
-    evPath = os.path.join(PATH_CURSO , "ev")
-
-    if len(videoPath) > 254:
-        if not os.path.exists(evPath):
-            os.makedirs(evPath)
-
-        tempName = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        listPath = os.path.join(evPath , "list.txt")
-
-        with open(listPath, "a", encoding=ENCODING) as safelist:
-            safelist.write(f"{tempName} = {videoPath}\n")
-
-        videoPath = os.path.join(evPath , f"{tempName}.mp4")
-
-    return videoPath
+    return filePath
 
 def baixarCurso(infoCurso: CursoHotmart, downloadAll):
     TEMP_FOLDER = criaTempFolder()
-    NOME_CURSO, PATH_CURSO = criaCurso(infoCurso.NOME)
+    NOME_CURSO = limpaString(infoCurso.NOME)
+    PATH_CURSO = criaCurso(NOME_CURSO)
     
     clearScreen()
 
@@ -304,11 +324,13 @@ def baixarCurso(infoCurso: CursoHotmart, downloadAll):
 
     try:
         for modulo in curso['modules']:
-            NOME_MODULO, PATH_MODULO = criaSubDir(PATH_CURSO, modulo['moduleOrder'], modulo['name'])
+            NOME_MODULO = criaNome(modulo['moduleOrder'], modulo['name'])
+            PATH_MODULO = criaSubDir(PATH_CURSO, NOME_MODULO)
             moduleCount += 1
 
             for aula in modulo['pages']:
-                NOME_AULA, PATH_AULA = criaSubDir(PATH_MODULO, aula['pageOrder'], aula['name'])
+                NOME_AULA = criaNome(aula['pageOrder'], aula['name'])
+                PATH_AULA = criaSubDir(PATH_MODULO, NOME_AULA)
 
                 print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{NOME_MODULO}{Colors.Magenta}/{Colors.Green}{NOME_AULA}{Colors.Magenta}!{Colors.Reset}")
 
@@ -325,32 +347,32 @@ def baixarCurso(infoCurso: CursoHotmart, downloadAll):
                 while tryDL:
                     try:
                         try:
-                           # videos, videosLongos, segVideos = downloadVideos(authMart, TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
-                           # vidCount += videos
+                            videos, videosLongos, segVideos = downloadVideos(TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
+                            vidCount += videos
                             pass
 
                         # Download de aula Externa
                         except KeyError:
-                           # videos, videosLongos, videosInexistentes = downloadVideoExterno(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
-                           # vidCount += videos
+                           videos, videosLongos, videosInexistentes = downloadVideoExterno(PATH_CURSO, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                           vidCount += videos
                            pass
 
                         # Count Descrições
                         try:
-                            descCount, descLongas = downloadDescricoes(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                            descCount, descLongas = downloadDescricoes(PATH_CURSO, NOME_AULA, infoAula)
 
                         except KeyError:
                             pass
 
                         # Count Anexos
                         try:
-                            attCount, anexosLongos = downloadAttachments(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                            attCount, anexosLongos = downloadAttachments(PATH_CURSO, infoAula)
                         except KeyError:
                             pass
 
                         # Count Links Complementares
                         try:
-                            linkCount, linksLongos = downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
+                            linkCount, linksLongos = downloadLinks(PATH_CURSO, NOME_AULA, infoAula)
                         except KeyError:
                             pass
 
@@ -395,140 +417,101 @@ def baixarCurso(infoCurso: CursoHotmart, downloadAll):
     https://github.com/katomaro/Hotmart-download-bot""")
 
     for f in glob.glob(f"{TEMP_FOLDER}/*"):
-        os.remove(f)
+        try:
+            os.remove(f)
+        except:
+            pass
 
     time.sleep(3)
 
-    os.rmdir(TEMP_FOLDER)
+    try:
+        os.rmdir(TEMP_FOLDER)
+    except:
+        pass
 
     if not downloadAll:
         verCursos()
 
-def downloadDescricoes(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+def downloadDescricoes(pathCurso, nomeAula, infoAula):
     descCount = 0
     descLongas = 0
 
     if infoAula['content']:
-        # TODO Mesmo trecho de aula longa zzz
-        descPath =  os.path.join(PATH_AULA, "desc.html")
+        fileName = "desc.html"
+        descPath = criaArquivo(pathCurso, nomeAula, "ed",  fileName)
 
-        if len(descPath) > 254:
-            edPath = os.path.join(PATH_CURSO, "ed")
-
-            if not os.path.exists(edPath):
-                os.makedirs(edPath)
-
-            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            listPath = os.path.join(edPath, "list.txt")
-            
-            with open(listPath, "a", encoding=ENCODING) as safelist:
-                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/desc.html\n")
-
-            descPath = os.path.join(edPath, "{tempNM}.html")
+        if not descPath.endswith(fileName):
             descLongas += 1
 
         if not os.path.isfile(descPath):
-            with open(descPath, "w", encoding=ENCODING) as description:
-                description.write(infoAula['content'])
-                print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
-
-        descCount += 1
+            try:
+                with open(descPath, "w", encoding=ENCODING) as description:
+                    description.write(infoAula['content'])
+                    print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
+                    descCount += 1
+            except:
+                print(f"{Colors.Red}Erro ao salvar descrição da aula!{Colors.Reset}")
 
     return descCount, descLongas
 
-def downloadLinks(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+def downloadLinks(pathCurso, nomeAula, infoAula):
     linkCount = 0
     linksLongos = 0
+    complimentaryReadings = infoAula['complementaryReadings']
 
-    if infoAula['complementaryReadings']:
-        # TODO Mesmo trecho de aula longa zzz
-        linksPath =  os.path.join(PATH_AULA, "links.txt")
+    if complimentaryReadings:
+        fileName = "links.txt"
+        linksPath = criaArquivo(pathCurso, nomeAula, "el",  fileName)
 
-        if len(linksPath) > 254:
-            elPath = os.path.join(PATH_CURSO, "el")
-
-            if not os.path.exists(elPath):
-                os.makedirs(elPath)
-
-            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            listPath = os.path.join(elPath, "list.txt")
-
-            with open(listPath, "a", encoding=ENCODING) as safelist:
-                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/links.txt\n")
-
-            linksPath = f"{elPath}/links.txt"
+        if not linksPath.endswith(fileName):
             linksLongos += 1
 
         if not os.path.isfile(f"{linksPath}"):
-            print(f"{Colors.Magenta}Link Complementar encontrado!{Colors.Reset}")
+            print(f"{Colors.Magenta}Link complementar encontrado!{Colors.Reset}")
 
-            for link in infoAula['complementaryReadings']:
-                with open(f"{linksPath}", "a", encoding=ENCODING) as linkz:
-                    linkz.write(f"{link}\n")
+            try:
+                for link in complimentaryReadings:
+                    with open(f"{linksPath}", "a", encoding=ENCODING) as linkz:
+                        linkz.write(f"{link}\n")
+            except:
+                print(f"{Colors.Red}Erro ao salvar links complementares!{Colors.Reset}")
 
         else:
-            print(f"{Colors.Green}Os Links já estavam presentes!{Colors.Reset}")
+            print(f"{Colors.Green}Os links já estavam presentes!{Colors.Reset}")
+        
+        linkCount += 1
 
-    linkCount += 1
     return linkCount,linksLongos
 
-def downloadAttachments(PATH_CURSO, PATH_AULA, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula):
+def downloadAttachments(pathCurso, infoAula):
     anexosLongos = 0
     attCount = 0
 
     for att in infoAula['attachments']:
         print(f"{Colors.Magenta}Tentando baixar o anexo: {Colors.Red}{att['fileName']}{Colors.Reset}")
-        # TODO Mesmo trecho de aula longa zzz
-        materiaisPath =  os.path.join(PATH_AULA, "Materiais")
-        attachmentPath = os.path.join(materiaisPath, att['fileName'])
+        fileName = att['fileName']
+        attachmentPath = criaArquivo(pathCurso, "Materiais", "et",  fileName)
 
-        if len(attachmentPath) > 254:
-            etPath = os.path.join(PATH_CURSO, "et")
-
-            if not os.path.exists(etPath):
-                os.makedirs(etPath)
-
-            tempNM = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            listPath = os.path.join(etPath, "list.txt")
-
-            with open(listPath, "a", encoding=ENCODING) as safelist:
-                safelist.write(f"{tempNM} = {NOME_CURSO}/{NOME_MODULO}/{NOME_AULA}/Materiais/{att['fileName']}\n")
-
-            fileName = f"{tempNM}.{att['fileName'].split('.')[-1]}"
-            attachmentPath = os.path.join(etPath, fileName)
+        if not attachmentPath.endswith(fileName):
             anexosLongos += 1
-
-        try:
-            if not os.path.exists(materiaisPath):
-                os.makedirs(materiaisPath)
-        except:
-            pass
 
         if not os.path.isfile(attachmentPath):
             while True:
                 try:
-                    try:
-                        anexo = hotmart.get(f"{HOTMART_API}/attachment/{att['fileMembershipId']}/download").json()
-                        anexo = requests.get(anexo['directDownloadUrl'])
-                    except KeyError:
-                        vrum = requests.session()
-                        vrum.headers.update(hotmart.getHeaders())
-                        lambdaUrl = anexo['lambdaUrl']
-                        vrum.headers['token'] = anexo['token']
-                        anexo = requests.get(vrum.get(lambdaUrl).text)
-                        del vrum
+                    anexo = hotmart.getAttachment(att)
 
                     with open(f"{attachmentPath}", 'wb') as ann:
                         ann.write(anexo.content)
                         print(f"{Colors.Magenta}Anexo baixado com sucesso!{Colors.Reset}")
                     break
                 except:
-                    pass
+                    print(f"{Colors.Red}Erro ao salvar anexo!{Colors.Reset}")
+
         attCount += 1
 
     return attCount, anexosLongos
 
-def downloadVideos(TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula):
+def downloadVideos(tempFolder, pathCurso, nomeModulo, nomeAula, pathAula, infoAula):
     vidCount = 0
     videosLongos = 0
     segVideos = 0
@@ -543,16 +526,16 @@ def downloadVideos(TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, i
         segVideos += playerInfo['mediaDuration']
 
         for asset in playerInfo['assets']:
-            videoPath = criaVideo(PATH_CURSO, PATH_AULA, index)
+            fileName = f"aula-{index}.mp4"
+            videoPath = criaArquivo(pathCurso, nomeAula, "ev",fileName )
 
-            # TODO Melhorar esse workaround para nome longo
-            if len(videoPath) > 254:
+            if not videoPath.endswith(fileName):
                 videosLongos += 1
 
             success = None
 
             if not os.path.isfile(videoPath):
-                success = downloadVideoNativo(PATH_AULA, TEMP_FOLDER, NOME_MODULO, NOME_AULA, playerInfo, asset)
+                success = downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, playerInfo['cloudFrontSignature'], asset)
             else:
                 print("VIDEO JA EXISTE")
                 success = True
@@ -563,7 +546,7 @@ def downloadVideos(TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, i
     # tryDL = 0
     return vidCount, videosLongos, segVideos
 
-def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, infoAula):
+def downloadVideoExterno(pathCurso, nomeCurso, nomeModulo, nomeAula, infoAula):
     try:
         fonteExterna = None
         videosLongos = 0
@@ -574,11 +557,10 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
         iFrames = content.findAll("iframe")
 
         for index, iFrame in enumerate(iFrames, start=1):
-            # TODO Mesmo trecho de aula longa
-            videoPath = criaVideo(pathCurso, pathAula, index)
+            fileName = f"aula-{index}.mp4"
+            videoPath = criaArquivo(pathCurso, nomeAula, "ev", fileName)
 
-            # TODO Melhorar esse workaround para nome longo
-            if len(videoPath) > 254:
+            if not videoPath.endswith(fileName):
                 videosLongos += 1
 
             if not os.path.isfile(videoPath):
@@ -635,7 +617,7 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
                         errorPath = os.path.join(pathCurso, "erros.txt")
 
                         with open(errorPath, "a", encoding=ENCODING) as elog:
-                            elog.write( f"{videoLink} - {nomeCurso}/{nomeModulo}/{NomeAula}")
+                            elog.write( f"{videoLink} - {nomeCurso}/{nomeModulo}/{nomeAula}")
 
                         videosInexistentes += 1
             else:
@@ -649,9 +631,9 @@ def downloadVideoExterno(pathCurso, pathAula, nomeCurso, nomeModulo, NomeAula, i
 
     return vidCount, videosLongos, videosInexistentes
 
-def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, playerInfo, asset):
+def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, cloudFrontSignature, asset):
     try:
-        videoData = hotmart.get(f"{asset['url']}?{playerInfo['cloudFrontSignature']}")
+        videoData = hotmart.get(f"{asset['url']}?{cloudFrontSignature}")
         masterPlaylist = m3u8.loads(videoData.text)
         res = []
         highestQual = None
@@ -666,7 +648,7 @@ def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, playerInfo, 
                 highestQual = playlist.uri
 
         if highestQual is not None:
-            videoData = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{playerInfo['cloudFrontSignature']}")
+            videoData = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual}?{cloudFrontSignature}")
 
             with open(f'{tempFolder}/dump.m3u8', 'w') as dump:
                 dump.write(videoData.text)
@@ -678,12 +660,12 @@ def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, playerInfo, 
             for segment in videoPlaylist.segments:
                 print(f"\r\tBaixando o segmento {Colors.Blue}{segment.uri.split('.')[0].split('-')[1]}{Colors.Reset}/{Colors.Magenta}{totalSegmentos}{Colors.Reset}!", end="", flush=True)
                 uri = segment.uri
-                frag = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{playerInfo['cloudFrontSignature']}")
+                frag = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{uri}?{cloudFrontSignature}")
 
                 with open(f"{tempFolder}/" + uri, 'wb') as sfrag:
                     sfrag.write(frag.content)
 
-            fragkey = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{playerInfo['cloudFrontSignature']}")
+            fragkey = hotmart.get(f"{asset['url'][:asset['url'].rfind('/')]}/{highestQual.split('/')[0]}/{key}?{cloudFrontSignature}")
 
             with open(f"{tempFolder}/{key}", 'wb') as skey:
                 skey.write(fragkey.content)
