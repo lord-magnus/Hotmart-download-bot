@@ -15,6 +15,7 @@ import time
 
 import m3u8
 import requests
+from requests.sessions import Session
 import youtube_dl
 
 from bs4 import BeautifulSoup
@@ -42,12 +43,10 @@ class Hotmart:
         ' Chrome/91.0.4472.106 Safari/537.36'
     )
 
-    _authMart = None
-
     def __init__(self, userEmail, userPass) -> None:
-        self._authMart = self._auth(userEmail, userPass)
+        self._authMart: Session = self._auth(userEmail, userPass)
 
-    def _auth(self, userEmail, userPass):
+    def _auth(self, userEmail, userPass) -> Session:
         authMart = requests.session()
         authMart.headers['user-agent'] = self._USER_AGENT
 
@@ -76,11 +75,12 @@ class Hotmart:
         CHECK_TOKEN_URL = 'https://api-sec-vlc.hotmart.com/security/oauth/check_token'
         TOKEN = self._authMart.headers['authorization'].split(" ")[1]
 
-        return self.get(CHECK_TOKEN_URL, params={'token': TOKEN}).json()['resources']
+        checkToken = self.get(CHECK_TOKEN_URL, params={'token': TOKEN}).json()
+        return checkToken['resources']
 
-    def getCursos(self):
+    def getCursos(self) -> list[CursoHotmart]:
         produtos = self.getProdutos()
-        cursosValidos = []
+        cursosValidos: list[CursoHotmart] = []
 
         for produto in produtos:
             try:
@@ -93,21 +93,6 @@ class Hotmart:
                 continue
 
         return cursosValidos
-
-    def getInfoAula(self, infoCurso: CursoHotmart, hash):
-        #  TODO Melhorar isso lol
-        infoAula = None
-
-        while True:
-            try:
-                infoAula = self.get(f'{HOTMART_API}/page/{hash}').json()
-                break
-            except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                self._authMart = self._auth(USER_EMAIL, USER_PASS)
-                self.setHeaders(infoCurso)
-                continue
-
-        return infoAula
 
     def getPlayerInfo(self, media):
         playerData = self.get(media['mediaSrcUrl']).text
@@ -151,35 +136,83 @@ class Hotmart:
             del vrum
         return anexo
 
+class AulaHotmart:
+    def __init__(self, hotmart: Hotmart, path, aula) -> None:
+        self.ORDER: int = aula['pageOrder']
+        self.NAME: string = limpaString(aula['name'])
+        self.FULL_NAME: string = f"{self.ORDER}. " + self.NAME
+        self.HASH: string = aula["hash"]
+        self.BASE_PATH: string = path
+        self.PATH: string = criaSubDir(path, self.FULL_NAME)
+
+        self._HOTMART: Hotmart = hotmart
+
+    def getInfo(self, infoCurso: CursoHotmart, hash):
+        infoAula = None
+
+        while True:
+            try:
+                self._HOTMART.setHeaders(infoCurso)
+                infoAula = self._HOTMART.get(f'{HOTMART_API}/page/{hash}').json()
+                break
+            except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
+                self._authMart = self._HOTMART._auth(USER_EMAIL, USER_PASS)
+                self._HOTMART.setHeaders(infoCurso)
+                continue
+
+        return infoAula
+
+class ModuloHotmart:
+    def __init__(self, hotmart: Hotmart, path, modulo) -> None:
+        self.ORDER: int = modulo['moduleOrder']
+        self.NAME: string = limpaString(modulo['name'])
+        self.FULL_NAME: string = f"{self.ORDER}. " + self.NAME
+        self.BASE_PATH: string = path
+        self.PATH: string = criaSubDir(path, self.FULL_NAME)
+        self.AULAS: list[AulaHotmart] = []
+        self._HOTMART: Hotmart = hotmart
+
+        for aulaInfo in modulo['pages']:
+            try:
+                aula = AulaHotmart(hotmart, self.PATH, aulaInfo)
+                
+                self.AULAS.append(aula)
+            except KeyError:
+                continue
+
 class CursoHotmart:
-    _HOST = None
-    _URL = None
-    _HOTMART = None
-    _product = None
-
-    STATUS = None
-    ROLES = None
-    NOME = None
-
     def __init__(self, hotmart: Hotmart, product) -> None:
-        self._product = product
-        self.STATUS = product['resource']['status']
-        self.ROLES = product['roles']
-        self._HOST = product['resource']['subdomain']
-        self._URL = f'https://{self._HOST}.club.hotmart.com'
-        self._HOTMART = hotmart
+        self.STATUS: string = product['resource']['status']
+        self.ROLES: string = product['roles']
+        self._HOST: string = product['resource']['subdomain']
+        self._URL: string = f'https://{self._HOST}.club.hotmart.com'
+        self.MODULOS: list[ModuloHotmart] = []
 
+        youtube_dl.utils.std_headers['Referer'] = self._URL
+        
         hotmart.setHeaders(self)
         membership = hotmart \
                     .get(f'{HOTMART_API}/membership?attach_token=false') \
-                    .json()['name']
+                    .json()
 
-        self.NOME = limpaString(membership)
+        self.NOME = limpaString(membership['name'])
+        self.PATH = criaCurso(self.NOME)
+
+        hotmart.setHeaders(self)
+        curso = hotmart.get(f'{HOTMART_API}/navigation').json()
+
+        for moduloInfo in curso['modules']:
+            try:
+                modulo = ModuloHotmart(hotmart, self.PATH, moduloInfo)
+                
+                self.MODULOS.append(modulo)
+            except KeyError:
+                continue
 
 hotmart = Hotmart(USER_EMAIL, USER_PASS)
 
 def clearScreen():
-    if sys.platform.startswith('darwin'):
+    if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
         # MacOs specific procedures
         os.system("clear")
     elif sys.platform.startswith('win32'):
@@ -204,6 +237,141 @@ def verCursos():
             baixarCurso(curso, True)
     else:
         baixarCurso(cursosValidos[OPCAO], False)
+
+def baixarCurso(infoCurso: CursoHotmart, downloadAll):
+    TEMP_FOLDER = criaTempFolder()
+    
+    clearScreen()
+
+    if downloadAll:
+        global maxCursos
+        global cursoAtual
+
+        print(f"{Colors.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
+        cursoAtual += 1
+
+    print(f"Baixando o curso: {Colors.Cyan}{Colors.Bold}{infoCurso.NOME}{Colors.Reset} (pressione {Colors.Magenta}ctrl+c{Colors.Reset} a qualquer momento para {Colors.Red}cancelar{Colors.Reset})")
+    
+    # Descomentar para ver o que caralhos a plataforma dá de json de curso
+    # with open('data.json', 'w', encoding=ENCODING) as f:
+    #     json.dump(curso, f, ensure_ascii=False, indent=4)
+
+    lessonCount = 0
+
+    vidCount = 0
+    videosLongos = 0
+    videosInexistentes = 0
+    segVideos = 0
+    
+    descCount = 0
+    attCount = 0
+    linkCount = 0
+    descLongas = 0
+    linksLongos = 0
+    anexosLongos = 0
+
+    try:
+        for modulo in infoCurso.MODULOS:
+            for aula in modulo.AULAS:
+                print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{modulo.FULL_NAME}{Colors.Magenta}/{Colors.Green}{aula.FULL_NAME}{Colors.Magenta}!{Colors.Reset}")
+
+                lessonCount += 1
+                infoAula = aula.getInfo(infoCurso, aula.HASH)
+
+                # Descomentar para ver o que caralhos a plataforma retorna na página
+                # with open('aula.json', 'w', encoding=ENCODING) as f:
+                #     json.dump(infoAula, f, ensure_ascii=False, indent=4)
+
+                # Download Aulas Nativas (HLS)
+                tryDL = 2
+
+                while tryDL:
+                    try:
+                        try:
+                            videos, videosLongos, segVideos = downloadVideos(TEMP_FOLDER, modulo.PATH, modulo.FULL_NAME, aula.FULL_NAME, aula.PATH, infoAula)
+                            vidCount += videos
+                            pass
+
+                        # Download de aula Externa
+                        except KeyError:
+                           videos, videosLongos, videosInexistentes = downloadVideoExterno(modulo.PATH, infoCurso.NOME, modulo.FULL_NAME, aula.FULL_NAME, infoAula)
+                           vidCount += videos
+                           pass
+
+                        # Count Descrições
+                        try:
+                            descCount, descLongas = downloadDescricoes(modulo.PATH, aula.FULL_NAME, infoAula)
+
+                        except KeyError:
+                            pass
+
+                        # Count Anexos
+                        try:
+                            attCount, anexosLongos = downloadAttachments(modulo.PATH, infoAula)
+                        except KeyError:
+                            pass
+
+                        # Count Links Complementares
+                        try:
+                            linkCount, linksLongos = downloadLinks(modulo.PATH, aula.FULL_NAME, infoAula)
+                        except KeyError:
+                            pass
+
+                    except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
+                        hotmart._auth(USER_EMAIL, USER_PASS)
+                        hotmart.setHeaders(infoCurso)
+                        tryDL -= 1
+                        continue
+                    break
+    except KeyError:
+        print(f"\t{Colors.Red}Recurso sem módulos!{Colors.Reset}")
+
+    with open(f"Cursos/{infoCurso.NOME}/info.txt", "w", encoding=ENCODING) as nfo:
+        nfo.write(f"""Info sobre o rip do curso: {infoCurso.NOME} ({infoCurso._URL})
+    Data do rip: {datetime.datetime.today().strftime('%d/%m/%Y')}
+    Quantidade de recursos/erros (na run que completou):
+        Quantidade de Módulos: {infoCurso.MODULOS.count};
+        Quantidade de Aulas: {lessonCount};
+        Quantidade de Vídeos: {vidCount}/{videosLongos}, inexistentes: {videosInexistentes};
+            Duração (Aproximada, HLS apenas): {segVideos} segundos;
+        Quantidade de Descrições(/aulas texto): {descCount}/{descLongas};
+        Quantidade de Leitura Complementar: {linkCount}/{linksLongos};
+        Quantidade de Anexos: {attCount}/{anexosLongos};
+
+    Caso você esteja vendo algum erro qualquer, entenda:
+        Estes erros se referem apenas à erros relacionados à caminhos muito longos, por limitação do sistema de arquivos
+        Neste caso, uma pasta chamda "eX" foi criada e o arquivo foi salvo dentro dela com um nome aleatório
+        No lugar de X vai uma letra para o que deu erro, sendo "v" para vídeo, "d" para descrição "l" para link
+        e "t" para anexo. Dentro da pasta existe um arquivo .txt com a função de te informar onde cada arquivo deveria estar
+        e com qual nome. Sinta-se livre de reornigazar e encurtar nomes para deixar organizado, ou não :)
+
+    Vídeos Inexistentes são Lives Agendadas no Youtube, ou, vídeos que foram apagado de onde estavam hospedados.
+    Verifique o arquivo "erros.txt", caso exista.
+    
+    A duração aproximada se refere aos segundos que o player nativo da Hotmart diz para cada aula, não contabilizando aulas do Vimeo/Youtube.
+
+    Run que completou se refere à execução do script que terminou o download.
+
+    A enumeração pode parecer estar faltando coisas, mas geralmente não está, a hotmart que a entrega de forma cagada.
+
+    O script utilizado para download pode ser encontrado no seguinte link:
+    https://github.com/katomaro/Hotmart-download-bot""")
+
+    for f in glob.glob(f"{TEMP_FOLDER}/*"):
+        try:
+            os.remove(f)
+        except:
+            pass
+
+    time.sleep(3)
+
+    try:
+        os.rmdir(TEMP_FOLDER)
+    except:
+        pass
+
+    if not downloadAll:
+        verCursos()
 
 def criaTempFolder():
     CURRENT_FOLDER = os.path.abspath(os.getcwd())
@@ -249,15 +417,11 @@ def limpaString(string):
 
     return result
 
-def criaNome(order, nome):
-    cleanName = f"{order}. " + limpaString(nome)
-    return cleanName
-
-def criaArquivo(pathCurso, aula, prefix, name):
-    fileDir = os.path.join(pathCurso, aula)
+def criaArquivo(basePath, folder, prefix, name):
+    fileDir = os.path.join(basePath, folder)
     filePath = os.path.join(fileDir, name)
     fileExtension = os.path.splitext(name)[1][1:].strip() 
-    tempPath = os.path.join(pathCurso, prefix)
+    tempPath = os.path.join(basePath, prefix)
 
     if len(filePath) > 254:
         if not os.path.exists(tempPath):
@@ -271,7 +435,7 @@ def criaArquivo(pathCurso, aula, prefix, name):
 
         try:
             with open(listPath, "a", encoding=ENCODING) as safelist:
-                safelist.write(f"{tempName} = {aula}\n")
+                safelist.write(f"{tempName} = {folder}\n")
         except:
             pass
 
@@ -282,215 +446,73 @@ def criaArquivo(pathCurso, aula, prefix, name):
 
     return filePath
 
-def baixarCurso(infoCurso: CursoHotmart, downloadAll):
-    TEMP_FOLDER = criaTempFolder()
-    NOME_CURSO = limpaString(infoCurso.NOME)
-    PATH_CURSO = criaCurso(NOME_CURSO)
-    
-    clearScreen()
-
-    if downloadAll:
-        global maxCursos
-        global cursoAtual
-
-        print(f"{Colors.Magenta}Modo de download de todos os cursos! {cursoAtual}/{maxCursos}")
-        cursoAtual += 1
-
-    youtube_dl.utils.std_headers['Referer'] = infoCurso._URL
-    hotmart.setHeaders(infoCurso)
-
-    curso = hotmart.get(f'{HOTMART_API}/navigation').json()
-
-    print(f"Baixando o curso: {Colors.Cyan}{Colors.Bold}{NOME_CURSO}{Colors.Reset} (pressione {Colors.Magenta}ctrl+c{Colors.Reset} a qualquer momento para {Colors.Red}cancelar{Colors.Reset})")
-    
-    # Descomentar para ver o que caralhos a plataforma dá de json de curso
-    # with open('data.json', 'w', encoding=ENCODING) as f:
-    #     json.dump(curso, f, ensure_ascii=False, indent=4)
-
-    moduleCount = 0
-    lessonCount = 0
-
-    vidCount = 0
-    videosLongos = 0
-    videosInexistentes = 0
-    segVideos = 0
-    
+def downloadDescricoes(pathModulo, nomeAula, infoAula):
     descCount = 0
-    attCount = 0
-    linkCount = 0
     descLongas = 0
-    linksLongos = 0
-    anexosLongos = 0
 
-    try:
-        for modulo in curso['modules']:
-            NOME_MODULO = criaNome(modulo['moduleOrder'], modulo['name'])
-            PATH_MODULO = criaSubDir(PATH_CURSO, NOME_MODULO)
-            moduleCount += 1
+    if not 'content' in infoAula:
+        return descCount, descLongas
 
-            for aula in modulo['pages']:
-                NOME_AULA = criaNome(aula['pageOrder'], aula['name'])
-                PATH_AULA = criaSubDir(PATH_MODULO, NOME_AULA)
+    fileName = "desc.html"
+    descPath = criaArquivo(pathModulo, nomeAula, "ed",  fileName)
 
-                print(f"{Colors.Magenta}Tentando baixar a aula: {Colors.Cyan}{NOME_MODULO}{Colors.Magenta}/{Colors.Green}{NOME_AULA}{Colors.Magenta}!{Colors.Reset}")
+    if not descPath.endswith(fileName):
+        descLongas += 1
 
-                lessonCount += 1
-                infoAula = hotmart.getInfoAula(infoCurso, aula["hash"])
-
-                # Descomentar para ver o que caralhos a plataforma retorna na página
-                # with open('aula.json', 'w', encoding=ENCODING) as f:
-                #     json.dump(infoAula, f, ensure_ascii=False, indent=4)
-
-                # Download Aulas Nativas (HLS)
-                tryDL = 2
-
-                while tryDL:
-                    try:
-                        try:
-                            videos, videosLongos, segVideos = downloadVideos(TEMP_FOLDER, PATH_CURSO, NOME_MODULO, NOME_AULA, PATH_AULA, infoAula)
-                            vidCount += videos
-                            pass
-
-                        # Download de aula Externa
-                        except KeyError:
-                           videos, videosLongos, videosInexistentes = downloadVideoExterno(PATH_CURSO, NOME_CURSO, NOME_MODULO, NOME_AULA, infoAula)
-                           vidCount += videos
-                           pass
-
-                        # Count Descrições
-                        try:
-                            descCount, descLongas = downloadDescricoes(PATH_CURSO, NOME_AULA, infoAula)
-
-                        except KeyError:
-                            pass
-
-                        # Count Anexos
-                        try:
-                            attCount, anexosLongos = downloadAttachments(PATH_CURSO, infoAula)
-                        except KeyError:
-                            pass
-
-                        # Count Links Complementares
-                        try:
-                            linkCount, linksLongos = downloadLinks(PATH_CURSO, NOME_AULA, infoAula)
-                        except KeyError:
-                            pass
-
-                    except (HTTPError, ConnectionError, Timeout, ChunkedEncodingError, ContentDecodingError):
-                        hotmart._auth(USER_EMAIL, USER_PASS)
-                        hotmart.setHeaders(infoCurso)
-                        tryDL -= 1
-                        continue
-                    break
-    except KeyError:
-        print(f"\t{Colors.Red}Recurso sem módulos!{Colors.Reset}")
-
-    with open(f"Cursos/{NOME_CURSO}/info.txt", "w", encoding=ENCODING) as nfo:
-        nfo.write(f"""Info sobre o rip do curso: {NOME_CURSO} ({infoCurso._URL})
-    Data do rip: {datetime.datetime.today().strftime('%d/%m/%Y')}
-    Quantidade de recursos/erros (na run que completou):
-        Quantidade de Módulos: {moduleCount};
-        Quantidade de Aulas: {lessonCount};
-        Quantidade de Vídeos: {vidCount}/{videosLongos}, inexistentes: {videosInexistentes};
-            Duração (Aproximada, HLS apenas): {segVideos} segundos;
-        Quantidade de Descrições(/aulas texto): {descCount}/{descLongas};
-        Quantidade de Leitura Complementar: {linkCount}/{linksLongos};
-        Quantidade de Anexos: {attCount}/{anexosLongos};
-
-    Caso você esteja vendo algum erro qualquer, entenda:
-        Estes erros se referem apenas à erros relacionados à caminhos muito longos, por limitação do sistema de arquivos
-        Neste caso, uma pasta chamda "eX" foi criada e o arquivo foi salvo dentro dela com um nome aleatório
-        No lugar de X vai uma letra para o que deu erro, sendo "v" para vídeo, "d" para descrição "l" para link
-        e "t" para anexo. Dentro da pasta existe um arquivo .txt com a função de te informar onde cada arquivo deveria estar
-        e com qual nome. Sinta-se livre de reornigazar e encurtar nomes para deixar organizado, ou não :)
-
-    Vídeos Inexistentes são Lives Agendadas no Youtube, ou, vídeos que foram apagado de onde estavam hospedados.
-    Verifique o arquivo "erros.txt", caso exista.
-    
-    A duração aproximada se refere aos segundos que o player nativo da Hotmart diz para cada aula, não contabilizando aulas do Vimeo/Youtube.
-
-    Run que completou se refere à execução do script que terminou o download.
-
-    A enumeração pode parecer estar faltando coisas, mas geralmente não está, a hotmart que a entrega de forma cagada.
-
-    O script utilizado para download pode ser encontrado no seguinte link:
-    https://github.com/katomaro/Hotmart-download-bot""")
-
-    for f in glob.glob(f"{TEMP_FOLDER}/*"):
+    if not os.path.isfile(descPath):
         try:
-            os.remove(f)
+            with open(descPath, "w", encoding=ENCODING) as description:
+                description.write(infoAula['content'])
+                print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
+                descCount += 1
         except:
-            pass
-
-    time.sleep(3)
-
-    try:
-        os.rmdir(TEMP_FOLDER)
-    except:
-        pass
-
-    if not downloadAll:
-        verCursos()
-
-def downloadDescricoes(pathCurso, nomeAula, infoAula):
-    descCount = 0
-    descLongas = 0
-
-    if infoAula['content']:
-        fileName = "desc.html"
-        descPath = criaArquivo(pathCurso, nomeAula, "ed",  fileName)
-
-        if not descPath.endswith(fileName):
-            descLongas += 1
-
-        if not os.path.isfile(descPath):
-            try:
-                with open(descPath, "w", encoding=ENCODING) as description:
-                    description.write(infoAula['content'])
-                    print(f"{Colors.Magenta}Descrição da aula salva!{Colors.Reset}")
-                    descCount += 1
-            except:
-                print(f"{Colors.Red}Erro ao salvar descrição da aula!{Colors.Reset}")
+            print(f"{Colors.Red}Erro ao salvar descrição da aula!{Colors.Reset}")
 
     return descCount, descLongas
 
-def downloadLinks(pathCurso, nomeAula, infoAula):
+def downloadLinks(pathModulo, nomeAula, infoAula):
     linkCount = 0
     linksLongos = 0
+
+    if not 'complementaryReadings' in infoAula:
+        return linkCount,linksLongos
+
     complimentaryReadings = infoAula['complementaryReadings']
 
-    if complimentaryReadings:
-        fileName = "links.txt"
-        linksPath = criaArquivo(pathCurso, nomeAula, "el",  fileName)
+    fileName = "links.txt"
+    linksPath = criaArquivo(pathModulo, nomeAula, "el",  fileName)
 
-        if not linksPath.endswith(fileName):
-            linksLongos += 1
+    if not linksPath.endswith(fileName):
+        linksLongos += 1
 
-        if not os.path.isfile(f"{linksPath}"):
-            print(f"{Colors.Magenta}Link complementar encontrado!{Colors.Reset}")
+    if not os.path.isfile(f"{linksPath}"):
+        print(f"{Colors.Magenta}Link complementar encontrado!{Colors.Reset}")
 
-            try:
-                for link in complimentaryReadings:
-                    with open(f"{linksPath}", "a", encoding=ENCODING) as linkz:
-                        linkz.write(f"{link}\n")
-            except:
-                print(f"{Colors.Red}Erro ao salvar links complementares!{Colors.Reset}")
+        try:
+            for link in complimentaryReadings:
+                with open(f"{linksPath}", "a", encoding=ENCODING) as linkz:
+                    linkz.write(f"{link}\n")
+        except:
+            print(f"{Colors.Red}Erro ao salvar links complementares!{Colors.Reset}")
 
-        else:
-            print(f"{Colors.Green}Os links já estavam presentes!{Colors.Reset}")
-        
-        linkCount += 1
+    else:
+        print(f"{Colors.Green}Os links já estavam presentes!{Colors.Reset}")
+    
+    linkCount += 1
 
     return linkCount,linksLongos
 
-def downloadAttachments(pathCurso, infoAula):
+def downloadAttachments(pathModulo, infoAula):
     anexosLongos = 0
     attCount = 0
+
+    if not 'attachments' in infoAula:
+        return attCount, anexosLongos
 
     for att in infoAula['attachments']:
         print(f"{Colors.Magenta}Tentando baixar o anexo: {Colors.Red}{att['fileName']}{Colors.Reset}")
         fileName = att['fileName']
-        attachmentPath = criaArquivo(pathCurso, "Materiais", "et",  fileName)
+        attachmentPath = criaArquivo(pathModulo, "Materiais", "et",  fileName)
 
         if not attachmentPath.endswith(fileName):
             anexosLongos += 1
@@ -511,10 +533,13 @@ def downloadAttachments(pathCurso, infoAula):
 
     return attCount, anexosLongos
 
-def downloadVideos(tempFolder, pathCurso, nomeModulo, nomeAula, pathAula, infoAula):
+def downloadVideos(tempFolder, pathModulo, nomeModulo, nomeAula, pathAula, infoAula):
     vidCount = 0
     videosLongos = 0
     segVideos = 0
+
+    if not 'mediasSrc' in infoAula:
+        return vidCount, videosLongos, segVideos
 
     for index, media in enumerate(infoAula['mediasSrc'], start=1):
         if media['mediaType'] != "VIDEO":
@@ -527,7 +552,7 @@ def downloadVideos(tempFolder, pathCurso, nomeModulo, nomeAula, pathAula, infoAu
 
         for asset in playerInfo['assets']:
             fileName = f"aula-{index}.mp4"
-            videoPath = criaArquivo(pathCurso, nomeAula, "ev",fileName )
+            videoPath = criaArquivo(pathModulo, nomeAula, "ev",fileName )
 
             if not videoPath.endswith(fileName):
                 videosLongos += 1
@@ -535,7 +560,7 @@ def downloadVideos(tempFolder, pathCurso, nomeModulo, nomeAula, pathAula, infoAu
             success = None
 
             if not os.path.isfile(videoPath):
-                success = downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, playerInfo['cloudFrontSignature'], asset)
+                success = downloadVideoNativo(videoPath, tempFolder, nomeModulo, nomeAula, playerInfo['cloudFrontSignature'], asset)
             else:
                 print("VIDEO JA EXISTE")
                 success = True
@@ -546,19 +571,22 @@ def downloadVideos(tempFolder, pathCurso, nomeModulo, nomeAula, pathAula, infoAu
     # tryDL = 0
     return vidCount, videosLongos, segVideos
 
-def downloadVideoExterno(pathCurso, nomeCurso, nomeModulo, nomeAula, infoAula):
+def downloadVideoExterno(pathModulo, nomeCurso, nomeModulo, nomeAula, infoAula):
     try:
         fonteExterna = None
         videosLongos = 0
         videosInexistentes = 0
         vidCount = 0
 
+        if not 'content' in infoAula:
+            return vidCount, videosLongos, videosInexistentes
+
         content = BeautifulSoup(infoAula['content'], features="html.parser")
         iFrames = content.findAll("iframe")
 
         for index, iFrame in enumerate(iFrames, start=1):
             fileName = f"aula-{index}.mp4"
-            videoPath = criaArquivo(pathCurso, nomeAula, "ev", fileName)
+            videoPath = criaArquivo(pathModulo, nomeAula, "ev", fileName)
 
             if not videoPath.endswith(fileName):
                 videosLongos += 1
@@ -614,7 +642,7 @@ def downloadVideoExterno(pathCurso, nomeCurso, nomeModulo, nomeAula, infoAula):
                         # TODO especificar os erros de Live Agendada(YouTube) e Video Inexistente
                     except:
                         print(f"{Colors.Red}O vídeo é uma Live Agendada, ou, foi apagado!{Colors.Reset}")
-                        errorPath = os.path.join(pathCurso, "erros.txt")
+                        errorPath = os.path.join(pathModulo, "erros.txt")
 
                         with open(errorPath, "a", encoding=ENCODING) as elog:
                             elog.write( f"{videoLink} - {nomeCurso}/{nomeModulo}/{nomeAula}")
@@ -631,8 +659,11 @@ def downloadVideoExterno(pathCurso, nomeCurso, nomeModulo, nomeAula, infoAula):
 
     return vidCount, videosLongos, videosInexistentes
 
-def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, cloudFrontSignature, asset):
+def downloadVideoNativo(videoPath, tempFolder, nomeModulo, nomeAula, cloudFrontSignature, asset):
     try:
+        if not 'url' in asset:
+            return False
+
         videoData = hotmart.get(f"{asset['url']}?{cloudFrontSignature}")
         masterPlaylist = m3u8.loads(videoData.text)
         res = []
@@ -675,9 +706,9 @@ def downloadVideoNativo(pathAula, tempFolder, nomeModulo, nomeAula, cloudFrontSi
             # TODO Implementar verificação de hardware acceleration
             # ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -hwaccel cuda -i {tempFolder}/dump.m3u8 -c:v h264_nvenc -n "{aulaPath}"'
 
-            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{pathAula}"'
+            ffmpegcmd = f'ffmpeg -hide_banner -loglevel error -v quiet -stats -allowed_extensions ALL -i {tempFolder}/dump.m3u8 -n "{videoPath}"'
 
-            if sys.platform.startswith('darwin'):
+            if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
                 # MacOs specific procedures
                 subprocess.run(ffmpegcmd, shell=True)
             elif sys.platform.startswith('win32'):
