@@ -1,0 +1,10 @@
+{
+    "python.pythonPath": "/usr/local/bin/python3",
+    "python.linting.enabled": true,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.python",
+        "editor.rulers": [79, 120]
+    },
+    "editor.rulers": [79, 120],
+    "[git-commit]": {"editor.rulers": [49]},
+}
